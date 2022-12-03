@@ -1,0 +1,4 @@
+1 consola eletronica 100 300
+2 prato cozinha 5 20
+3 cadeira casa 30 50
+4 agrafador papelaria 5 15
