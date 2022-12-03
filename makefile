@@ -1,21 +1,16 @@
 CC=gcc
 
-frontend: frontend.o
-	gcc frontend.o -o frontend
 
-frontend.o: frontend.c header.h
-	gcc frontend.c -c
+frontend: frontend.c header.h
+	gcc frontend.c -o frontend
 
-backend: backend.o
-	gcc backend.o users_lib.o -o backend
-
-backend.o: backend.c header.h
-	gcc backend.c -c
+backend: backend.c header.h
+	gcc backend.c -o backend
 
 all: frontend backend
 
 clean:
-	rm backend.o
-	rm frontend.o
+	rm backend
+	rm frontend
 	
 
