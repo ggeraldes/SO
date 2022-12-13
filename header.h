@@ -16,6 +16,9 @@
 #include <fcntl.h>
 #include "users_lib.h"
 
+#define BACKENDFIFO "BACKEND"
+#define FRONTENDFIFO "CLIENTE%d"
+char CLIENTE_FIFO_FINAL[100];
 
 struct cliente{
 	char nome[20];
