@@ -2,12 +2,12 @@
 
 #ifndef _HEADER_H_
 
-#include<stdio.h>
-#include<unistd.h>
-#include<signal.h>
-#include<stdlib.h>
-#include<time.h>
-#include<string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -19,6 +19,15 @@
 #define BACKENDFIFO "BACKEND"
 #define FRONTENDFIFO "CLIENTE%d"
 char CLIENTE_FIFO_FINAL[100];
+
+typedef struct{
+	pid_t pid;
+	//comando;
+}msgFtoB;
+
+typedef struct{
+	char res[100];
+}msgBtF;
 
 struct cliente{
 	char nome[20];
