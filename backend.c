@@ -1,30 +1,16 @@
 //===================== BACKEND =====================//
 
-
-
 #include "header.h"
-
-
-
-
 
 int main(int argc, char*argv[]){
 
-
-
 	do{
 
-
-
 		int op;
-
 		printf("\n1 - Executar promotor\n2 - Comandos\n3 - Leitura do ficheiro de itens\n4 - Gestão Utilizadores\n\nDeseja testar que funcionalidade: ");
-
-
 
 		scanf("%d", &op);
 		printf("\n");
-
 
 	if(op==1){
 
@@ -116,144 +102,78 @@ if (f == 0) {
 
         		close(fd_out[1]);
 
-
-
         		execl("./promotor_oficial", "./promotor_oficial", NULL);
 
     		}*/
 }
 
-
-
 	else if(op==2){
 
 		char com[50];
-
 		char stcom[50];
-
 		char ndcom[50];
 
-
-
-
-
 		printf("\nComando: ");
-
 		scanf("%s", com);
 
-
-
 		int i, j, k;
-
 		int spaceflag=0;
-
-
 
 		for(i=1; com[i]!='\0'; i++){
 
 			if(com[i-1]==' ' && com[i]!=' '){
-
 				spaceflag=1;
-
 				break;
-
 			}
-
 		}
 
-
-
 		if(spaceflag == 1){
-
 			for(i=0; com[i]!= ' '; i++){
-
 				stcom[i] = com[i];
-
 			}
 
 			stcom[i] = '\0';
 
-
-
 			if(strcmp(stcom, "kick")==0){
-
 				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
-
 					ndcom[k] = com[j];
 
 				}
-
 				printf("\nBanir o utilizador %s\n", ndcom);
-
 			}
-
-
 
 			else if(strcmp(stcom, "cancel")==0){
-
 				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
-
 					ndcom[k] = com[j];
-
 				}
-
 				printf("\nCancelar o promotor %s\n", ndcom);
-
 			}
-
 		}
 
 		else{
-
-
-
 			if(strcmp(com,"users")==0){
-
 				printf("\nLista os utilizadores\n");
-
 			}
-
-
 
 			else if(strcmp(com,"list")==0){
-
 				printf("\nLista os itens a venda\n");
-
 			}
-
-
 
 			else if(strcmp(com,"prom")==0){
-
 				printf("\nLista os promotores\n");
-
 			}
-
-
 
 			else if(strcmp(com,"reprom")==0){
-
 				printf("\nAtualiza os promotores\n");
-
 			}
-
-
 
 			else if(strcmp(com,"close")==0){
-
 				printf("\nA plataforma vai encerrar\n");
-
 				exit(-1);
-
 			}
 
-
-
 			else
-
 				printf("\nComando invalido!\n");
-
-
 
 		}
 
@@ -263,7 +183,7 @@ if (f == 0) {
 
 	else if(op==3){
 
-		int count=5, saldo, res;
+	int count=5, saldo, res;
 	char c;
 	char *nome;
 	int id, precoB, precoCP;
@@ -277,13 +197,13 @@ if (f == 0) {
             while(fscanf(f, "%19s", palavra)==1){
 				
             if(count==5){
-						id=atoi(palavra);
-                        printf("id: %d, ", id);
+		id=atoi(palavra);
+                printf("id: %d, ", id);
 						
                 count--;
             }
             else if(count==4){
-						printf("Nome: %s, ", palavra);
+		printf("Nome: %s, ", palavra);
                 count--;
             }
             else if(count==3){
@@ -291,7 +211,7 @@ if (f == 0) {
 				count--;
             }
 			else if(count==2){
-						precoB=atoi(palavra);
+			precoB=atoi(palavra);
                         printf("Preço Base: %d, ", precoB);
 				count--;
             }
@@ -317,16 +237,12 @@ if (f == 0) {
 
 	else if(op==4){
 
-
-	
 	if(loadUsersFile("./FUSERS.txt")==-1){
 
 	printf("Aconteceu um ERRO");
 	exit(1);
 	}
 	
-
-
 	int count=3, saldo, res;
 	char c;
 	char *nome;
@@ -353,8 +269,7 @@ if (f == 0) {
             else if(count==2){
                 count--;
             }
-			
-		
+
             else if(count==1){
                         printf("Saldo: %s\n", palavra);
                 count=3;
@@ -373,31 +288,15 @@ if (f == 0) {
     	}
 	}
 
-
-
 }
 
 else if(op==5){
 
 
-
-
-
-
-
-
-
-
-
-
-
 }
 	else
-
 		printf("Introduza uma opcao valida(1 ou 2)");
 
-
-
-	}while(1);
+}while(1);
 
 }
