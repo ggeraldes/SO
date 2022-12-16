@@ -29,13 +29,13 @@ typedef struct{
 	char res[100];
 }msgBtF;
 
-struct cliente{
+typedef struct{
 	char nome[20];
 	char pw[20];	     //password
 	int saldo;
-};
+}Cliente;
 
-typedef struct item{
+typedef struct{
 	int ID;
 	char nome[20];
 	char categoria[20];
@@ -43,10 +43,10 @@ typedef struct item{
 	int valcp;           //valor "comprar já"
 }Item;
 
-struct leilao{
+typedef struct{
 	Item item;
 	bool promocao;
-};
+}Leilao;
 
 
 #endif //_HEADER_H_
