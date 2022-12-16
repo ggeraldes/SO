@@ -295,7 +295,7 @@ else if(op==5){
 
 }
 	else
-		printf("Introduza uma opcao valida(1 ou 2)");
+		printf("Introduza uma opcao valida(1 a 4)");
 
 }while(1);
 
