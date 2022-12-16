@@ -7,7 +7,7 @@ int main(int argc, char*argv[]){
 	do{
 
 		int op;
-		printf("\n1 - Executar promotor\n2 - Comandos\n3 - Leitura do ficheiro de itens\n4 - Gestão Utilizadores\n\nDeseja testar que funcionalidade: ");
+		printf("\n1 - Executar promotor\n2 - Comandos\n3 - Leitura do ficheiro de itens\n4 - Gestao Utilizadores\n\nDeseja testar que funcionalidade: ");
 
 		scanf("%d", &op);
 		printf("\n");
