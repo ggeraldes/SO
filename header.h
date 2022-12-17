@@ -27,7 +27,7 @@ typedef struct{
 
 typedef struct{
 	char res[100];
-}msgBtF;
+}msgBtoF;
 
 typedef struct{
 	char nome[20];
