@@ -12,8 +12,11 @@ int verificaUtilizadores(int contadorClientes){
 			return 1;
 }
 
-void kill_process_child(int f){
-	 kill(f,SIGKILL);
+int verificaItems (int contadorItems){
+		if(contadorItems<=0)
+			return -1;
+		else
+			return 1;
 }
 
 int main(){
@@ -49,11 +52,8 @@ int main(){
 					if (count!=1)
 						count--;
 					else
-						count=3;
-							
+						count=3;			
 				}
-				
-				
 					
 			}
 		}
@@ -73,39 +73,40 @@ int main(){
 		contadorItens++;
 	}
 	fclose(f2);
-
-	contadorItens+=1;
+	if (contadorItens>0)
+		contadorItens+=1;
 
 	Item itens[contadorItens];
-	FILE *f3 = fopen("FITEMS.txt", "r");
+	if(verificaItems(contadorItens)==1){
+		FILE *f3 = fopen("FITEMS.txt", "r");
 
-	while((c = fgetc(f3))!= EOF){
-		ungetc (c,f3);
-		if(f2){
-			while(fscanf(f3, "%19s", palavra)==1){
-				if(i>=contadorItens)
-					break;
-				if(count==5)
-					itens[i].ID=atoi(palavra);
-				else if(count==4)
-					strcpy(itens[i].nome, palavra);
-				else if(count==3)
-					strcpy(itens[i].categoria, palavra);
-				else if(count==2)
-					itens[i].valbase=atoi(palavra);
-				else if(count==1)
-					itens[i].valcp=atoi(palavra);
-				if (count!=1)
-					count--;
-				else{
-					count=5;
-					i++;
-				}		
+		while((c = fgetc(f3))!= EOF){
+			ungetc (c,f3);
+			if(f2){
+				while(fscanf(f3, "%19s", palavra)==1){
+					if(i>=contadorItens)
+						break;
+					if(count==5)
+						itens[i].ID=atoi(palavra);
+					else if(count==4)
+						strcpy(itens[i].nome, palavra);
+					else if(count==3)
+						strcpy(itens[i].categoria, palavra);
+					else if(count==2)
+						itens[i].valbase=atoi(palavra);
+					else if(count==1)
+						itens[i].valcp=atoi(palavra);
+					if (count!=1)
+						count--;
+					else{
+						count=5;
+						i++;
+					}		
+				}				
 			}
-						
 		}
+		fclose(f3);
 	}
-	fclose(f3);
 	/*----------------------------------------------------------------------------*/
 
 	do{
@@ -218,11 +219,14 @@ int main(){
 
 
 		else if(op==3){
+			if(verificaItems(contadorItens)==1){
+				for(int g=0; g<contadorItens;g++)
+						printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d, VC: %d", itens[g].ID, itens[g].nome, itens[g].categoria, itens[g].valbase, itens[g].valcp);
 
-			for(int g=0; g<contadorItens;g++)
-					printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d, VC: %d", itens[g].ID, itens[g].nome, itens[g].categoria, itens[g].valbase, itens[g].valcp);
-
-			printf("\n");
+				printf("\n");
+			}
+			else
+				printf("\nNão foram encontrados itens!");
 		}
 
 		else if(op==4){
