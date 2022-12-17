@@ -20,5 +20,7 @@ clean:
 	rm frontend
 	rm frontend.o
 	rm backend.o
+	rm CLIENTE[[:digit:]]*
+	rm BACKENDFIFO
 	
 

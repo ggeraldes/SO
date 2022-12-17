@@ -10,6 +10,48 @@ int main(int argc, char*argv[]){
 		exit(-1);
 	}
 
+	verificaExistencia utilizador;
+	char fifo[40];
+	int fd, n, fdr;
+
+	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
+		fprintf(stderr, "[ERRO] O backend nao esta a funcionar!\n");
+		exit (1);
+    } 
+
+	//criar fifo FRONTENDFIFO+pid
+	utilizador.pid=getpid();
+	sprintf(fifo, FRONTENDFIFO, utilizador.pid);
+	mkfifo(fifo, 0600);
+
+	//Abrir o fifo do backend
+	fd = open(BACKENDFIFO, O_WRONLY);
+    printf("Abri o fifo do backend - '%s'\n", BACKENDFIFO);
+
+	//meter dados da sessão na estrutura, para enviar ao backend
+	strcpy(utilizador.nome, argv[1]);
+	strcpy(utilizador.pwd, argv[2]);
+	utilizador.validacao=0;
+
+	//mandar a struct ao backend
+	n=write(fd, &utilizador, sizeof(verificaExistencia));
+	printf("Enviei...%s %s %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, n);
+
+	//receber resposta de validacao do backend
+	fdr= open(fifo, O_RDONLY);
+	n = read(fdr, &utilizador, sizeof(verificaExistencia));
+	close(fdr);
+
+	
+	
+	if(utilizador.validacao==1)
+		printf("\nBem vindo!");
+	else{
+		printf("\nUtilizador não encontrado!");
+		unlink(fifo);
+		close(fd);
+		exit (1);
+	} 
 
 	char com[50];    //comando do utilizador
 	char stcom[50];  //primeira parte do comando do utilizador
@@ -143,5 +185,7 @@ int main(int argc, char*argv[]){
 		}
 
 	}while(1);
+
+	
 
 }
