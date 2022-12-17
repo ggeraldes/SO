@@ -2,12 +2,12 @@
 
 #ifndef _HEADER_H_
 
-#include <stdio.h>
-#include <unistd.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<signal.h>
+#include<stdlib.h>
+#include<time.h>
+#include<string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -29,13 +29,14 @@ typedef struct{
 	char res[100];
 }msgBtoF;
 
-typedef struct{
+
+typedef struct cliente{
 	char nome[20];
 	char pw[20];	     //password
 	int saldo;
 }Cliente;
 
-typedef struct{
+typedef struct item{
 	int ID;
 	char nome[20];
 	char categoria[20];
@@ -43,7 +44,7 @@ typedef struct{
 	int valcp;           //valor "comprar já"
 }Item;
 
-typedef struct{
+typedef struct leilao{
 	Item item;
 	bool promocao;
 }Leilao;

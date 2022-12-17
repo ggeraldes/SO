@@ -1,13 +1,15 @@
 //===================== FRONTEND =====================//
-
 #include "header.h"
 
-int main(int argc, char*argv[]){
 
+
+int main(int argc, char*argv[]){
+	
 	if(argc != 3){
 		printf("\nPor favor indique o seu nome e a sua password!\n");
 		exit(-1);
 	}
+
 
 	char com[50];    //comando do utilizador
 	char stcom[50];  //primeira parte do comando do utilizador
@@ -16,7 +18,6 @@ int main(int argc, char*argv[]){
 	char prbase[10];
 	char prcj[10];
 	char dur[10];
-
 	fflush(stdin);
 
 	do{
@@ -26,7 +27,6 @@ int main(int argc, char*argv[]){
 		int spaceflag=0;
 
 		for(i=1; com[i]!='\0'; i++){
-
 			if(com[i-1]==' ' && com[i]!=' '){
 				spaceflag=1;
 				break;
@@ -57,7 +57,6 @@ int main(int argc, char*argv[]){
 				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
 					ndcom[k] = com[j];
 				}
-
 				int valmax = atoi(ndcom);
 				printf("\nListar os itens da que custam até %d\n", valmax);
 			}
@@ -94,52 +93,53 @@ int main(int argc, char*argv[]){
 				for(k=0,j=i+1; com[j]!=' '; j++, k++){
 					ndcom[k] = com[j];
 				}
-				
+
 				for(k=0,j+=1; com[j]!=' '; j++, k++){
 					rdcom[k] = com[j];
 				}
-				
+
 				for(k=0,j+=1; com[j]!=' '; j++, k++){
 					prbase[k] = com[j];
 				}
+
 				int prb = atoi(prbase);
-				
 				for(k=0,j+=1; com[j]!=' '; j++, k++){
 					prcj[k] = com[j];
 				}
-				int prc = atoi(prcj);
 
+				int prc = atoi(prcj);
 				for(k=0,j+=1; com[j]!='\0'; j++, k++){
 					dur[k] = com[j];
 				}
-				int dtemp = atoi(dur);
 
+				int dtemp = atoi(dur);
 				printf("\nVender o item %s da categoria %s, com um preco base de %d, disponivel ja por %d durante %d segundos\n", ndcom, rdcom, prb, prc, dtemp);
 			}
-			
+
 			else
-				printf("\nComando invalido!\n");
+				printf("\nComando inválido!\n");
+
 		}
 
 		else if(spaceflag==0){
-			if(strcmp(com,"list\n")==0){
-				printf("\nLista os itens\n");
-			}
+		if(strcmp(com,"list\n")==0){
+			printf("\nLista os itens\n");
+		}
 
-			else if(strcmp(com,"time\n")==0){
-				printf("\nHora atual: \n");
-			}
+		else if(strcmp(com,"time\n")==0){
+			printf("\nHora atual: \n");
+		}
 
-			else if(strcmp(com,"cash\n")==0){
-				printf("\nSaldo atual: \n");
-			}
-			
-			else if(strcmp(com,"exit\n")==0){
-				exit(-1);
-			}
+		else if(strcmp(com,"cash\n")==0){
+			printf("\nSaldo atual: \n");
+		}
+
+		else if(strcmp(com,"exit\n")==0){
+			exit(-1);
+		}
 
 		else
-			printf("\nComando invalido!\n");
+			printf("\nComando inválido!\n");
 		}
 
 	}while(1);
