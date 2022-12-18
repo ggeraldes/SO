@@ -1,9 +1,20 @@
 //===================== FRONTEND =====================//
 #include "header.h"
 
+char fifo[40];
 
+void handler_sigalarm(int s,siginfo_t *t, void *v){
+                    unlink (fifo);
+                    printf("\nadeus\n");
+                    exit (1);
+
+}
 
 int main(int argc, char*argv[]){
+
+	struct sigaction sa;
+    sa.sa_sigaction=handler_sigalarm;
+    sigaction(SIGINT, &sa, NULL);
 	
 	if(argc != 3){
 		printf("\nPor favor indique o seu nome e a sua password!\n");
@@ -11,7 +22,6 @@ int main(int argc, char*argv[]){
 	}
 
 	verificaExistencia utilizador;
-	char fifo[40];
 	int fd, n, fdr;
 
 	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
@@ -47,7 +57,7 @@ int main(int argc, char*argv[]){
 	if(utilizador.validacao==1)
 		printf("\nBem vindo!");
 	else{
-		printf("\nUtilizador não encontrado!");
+		printf("\nUtilizador não encontrado!\n");
 		unlink(fifo);
 		close(fd);
 		exit (1);

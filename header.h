@@ -61,31 +61,7 @@ typedef struct leilao{
 
 
 
-verificaExistencia utilizador;
-int fd, n, fdr;
-int sel, sel1;
-char fifo[40];
-fd_set fds;
-void recebeEnvia(int contadorClientes, Cliente *clientes){
-	 n= read(fd, &utilizador, sizeof(verificaExistencia)); // HA DADOS.... NAO BLOQUEIA
-            printf("\nRecebi...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
 
-			//verifica na estrutura se existe
-			for(int j=0; j<contadorClientes; j++){
 
-				if(strcmp(clientes[j].nome, utilizador.nome)==0 && strcmp(clientes[j].pw, utilizador.pwd)==0){
-					utilizador.validacao=1;
-					break;
-				}
-
-			}
-
-			//enviar resposta
-			sprintf(fifo, FRONTENDFIFO, utilizador.pid);
-			fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
-			n= write(fdr, &utilizador, sizeof(verificaExistencia));
-			close(fdr);
-			printf("Enviei...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
-}
 
 #endif //_HEADER_H_

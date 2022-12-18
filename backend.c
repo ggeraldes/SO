@@ -40,6 +40,10 @@ int main(){
 	int contadorClientes=0, contadorItens=0;
 	contadorClientes = loadUsersFile("./FUSERS.txt");
 	Cliente clientes[contadorClientes];
+
+	Cliente clientesOnline[contadorClientes];
+	strcpy(clientesOnline[0].nome, "a");
+
 	/* GUARDAR DADOS DO FICHEIRO DE UTILIZADORES NA ESTRUTURA*/
 	if (verificaUtilizadores(contadorClientes)==1){
 
@@ -124,6 +128,12 @@ int main(){
 
 	/*VALIDACAO DE SESSÕES DO FRONTEND*/
 
+	verificaExistencia utilizador;
+	int fd, n, fdr;
+	int sel, sel1;
+	char fifo[40];
+	fd_set fds;
+
 	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
     	mkfifo(BACKENDFIFO, 0600);
     	printf("Criei o fifo\n");
@@ -135,7 +145,7 @@ int main(){
 
 
 		
-		printf("\n1 - Executar promotor\n2 - Comandos\n3 - Leitura do ficheiro de itens\n4 - Gestão Utilizadores\n\nDeseja testar que funcionalidade: ");
+		printf("\n<COMANDO>\n>");
 		fflush(stdout);
 
 		FD_ZERO(&fds);        // limpa o fds
@@ -148,13 +158,12 @@ int main(){
 
 
 			scanf("%d", &op);
-			fflush(stdout); 
-			printf("\n");
 			
 			
-			if(op==1){
+			
+			
 
-
+			/*-----------------PROMOTOR-------------------
 				int p_b[2];
 				int size, pid;
 				int estado;	
@@ -183,16 +192,13 @@ int main(){
 				close(p_b[0]);
 
 				wait(&estado);
-				
-			}
 
-			else if(op==2){
+			*/
 
 				char com[50];
 				char stcom[50];
 				char ndcom[50];
 
-				printf("\nComando: ");
 				scanf("%s", com);
 
 
@@ -232,10 +238,60 @@ int main(){
 
 				else{
 					if(strcmp(com,"users")==0){
+
 						printf("\nLista os utilizadores\n");
+						if(contadorClientes==-1)
+							printf("Aconteceu um ERRO a abrir o ficheiro 'FUSERS.txt'");
+						
+						else if(contadorClientes==0)
+							printf("Não há clientes");
+
+						else{
+							//int res=0;
+							int g;
+							for(g=0; g<contadorClientes;g++){
+
+								if(strcmp(clientesOnline[g].nome, "a")==0)
+								break; 
+								else
+								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, clientesOnline[g].saldo);
+								/*
+								res = updateUserBalance(clientes[g].nome, clientes[g].saldo-1);
+								
+								if(res==-1)
+								printf("\n[ERROR]-updateUserBalance\n");
+								else if(res==0)
+								printf("\nUtilizador não encontrado\n");
+								else
+								clientes[g].saldo-=1;
+								*/
+							}
+							if(g==0)
+								printf("Sem utilizadores online!\n");
+							/*
+							res=saveUsersFile("FUSERS.txt");
+							if(res==0)
+							printf("\nUtilizador guardados com sucesso\n");
+							else 
+							printf("\n[ERROR]-saveUsersFile\n");
+
+							*/
+
+						}
+
 					}
 					else if(strcmp(com,"list")==0){
+
 						printf("\nLista os itens a venda\n");
+						if(verificaItems(contadorItens)==1){
+							for(int g=0; g<contadorItens;g++)
+								printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d, VC: %d", itens[g].ID, itens[g].nome, itens[g].categoria, itens[g].valbase, itens[g].valcp);
+
+						printf("\n");
+						}
+						else
+							printf("\nNão foram encontrados itens!");
+
 					}
 					else if(strcmp(com,"prom")==0){
 						printf("\nLista os promotores\n");
@@ -251,60 +307,46 @@ int main(){
 						printf("\nComando invalido!\n");
 				}
 
-			}
+			
 
-
-
-			else if(op==3){
-				if(verificaItems(contadorItens)==1){
-					for(int g=0; g<contadorItens;g++)
-							printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d, VC: %d", itens[g].ID, itens[g].nome, itens[g].categoria, itens[g].valbase, itens[g].valcp);
-
-					printf("\n");
-				}
-				else
-					printf("\nNão foram encontrados itens!");
-			}
-
-			else if(op==4){
 
 			
-				if(contadorClientes==-1)
-					printf("Aconteceu um ERRO a abrir o ficheiro 'FUSERS.txt'");
-				
-				else if(contadorClientes==0)
-					printf("Não há clientes");
-
-				else{
-					int res=0;
-					for(int g=0; g<contadorClientes;g++){
-						printf("\nUtilizador: %s, Pass: %s, Saldo: %d", clientes[g].nome, clientes[g].pw, clientes[g].saldo);
-
-						res = updateUserBalance(clientes[g].nome, clientes[g].saldo-1);
-						
-						if(res==-1)
-						printf("\n[ERROR]-updateUserBalance\n");
-						else if(res==0)
-						printf("\nUtilizador não encontrado\n");
-						else
-						clientes[g].saldo-=1;
-					}
-
-					res=saveUsersFile("FUSERS.txt");
-					if(res==0)
-					printf("\nUtilizador guardados com sucesso\n");
-					else 
-					printf("\n[ERROR]-saveUsersFile\n");
-
-				}
-				
-					
-			}
-			else
-			printf("Introduza uma opcao valida(1 ou 2)");
+			
 		}
 		else if(sel>0 && FD_ISSET(fd, &fds)){
-			recebeEnvia(contadorClientes, clientes);
+			n= read(fd, &utilizador, sizeof(verificaExistencia)); // HA DADOS.... NAO BLOQUEIA
+            printf("\nRecebi...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
+
+			//verifica na estrutura se existe
+			for(int j=0; j<contadorClientes; j++){
+
+				if(strcmp(clientes[j].nome, utilizador.nome)==0 && strcmp(clientes[j].pw, utilizador.pwd)==0){
+					utilizador.validacao=1;
+					
+					//meter utilizador na estrutura online
+					for(int i=0;i<contadorClientes;i++){
+						if(strcmp(clientesOnline[i].nome, "a")==0){
+
+							strcpy(clientesOnline[i].nome, clientes[j].nome);
+							strcpy(clientesOnline[i].pw, clientes[j].pw);
+							clientesOnline[i].saldo=clientes[j].saldo;
+
+							strcpy(clientesOnline[i+1].nome, "a");
+							break;
+						}
+					}
+					break;
+				}
+
+			}
+			
+
+			//enviar resposta
+			sprintf(fifo, FRONTENDFIFO, utilizador.pid);
+			fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+			n= write(fdr, &utilizador, sizeof(verificaExistencia));
+			close(fdr);
+			printf("Enviei...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
 		}
 
 	}while(1);
