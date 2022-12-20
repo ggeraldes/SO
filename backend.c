@@ -19,18 +19,116 @@ int verificaItems (int contadorItems){
 			return 1;
 }
 
+void *imprimePromotor(void *a){
+	killThread *ta = (killThread*) a;
+	/*-----------------PROMOTOR-------------------*/
+				int p_b[2];
+				int size, pid;
+				int estado;	
+
+				pipe(p_b);
+				char  res[100];
+
+				int f = fork();
+				if(f == 0){
+					//filho corre o promotor
+					pid=getpid();
+					close(p_b[0]);
+					close(1);
+					dup(p_b[1]);
+
+					execlp("./promotor_oficial", "promotor_oficial", NULL);
+					exit(-1);
+						
+				}
+					
+				//pai continua a correr
+				close(p_b[1]);
+				
+				while((size = read(p_b[0], res, 99))>0 && ta->kill!=1){
+					res[size] = '\0';
+					if(strcmp(res,"\n")!=0)
+						printf("Promotor: %s\n", res);
+
+				}
+				close(p_b[0]);
+				
+
+				wait(&estado);
+
+			
+	
+    pthread_exit(NULL);
+}
+
+void *imprimePromotorBF(void *a){
+	killThread *ta = (killThread*) a;
+	/*-----------------PROMOTOR-------------------*/
+				int p_b[2];
+				int size, pid;
+				int estado;	
+
+				pipe(p_b);
+				char  res[100];
+
+				int f = fork();
+				if(f == 0){
+					//filho corre o promotor
+					pid=getpid();
+					close(p_b[0]);
+					close(1);
+					dup(p_b[1]);
+
+					execlp("./black_friday", "black_friday", NULL);
+					exit(-1);
+						
+				}
+					
+				//pai continua a correr
+				close(p_b[1]);
+				
+				while((size = read(p_b[0], res, 99))>0 && ta->kill!=2){
+					res[size] = '\0';
+					if(strcmp(res,"\n")!=0)
+						printf("Promotor BF: %s\n", res);
+
+				}
+				close(p_b[0]);
+				
+
+				wait(&estado);
+
+			
+	
+    pthread_exit(NULL);
+}
+
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (BACKENDFIFO);
-                    printf("\nadeus\n");
+					
+                    printf("\nAdeus\n");
                     exit (1);
 
 }
+
 
 int main(){
 
 	struct sigaction sa;
     sa.sa_sigaction=handler_sigalarm;
     sigaction(SIGINT, &sa, NULL);
+
+	/*------------thread promotor---------------
+	killThread a;
+	pthread_t promotor;
+	pthread_t promotorBF;
+	a.kill=0;
+	if(pthread_create(&promotor,NULL,&imprimePromotor, &a)!=0)
+		printf("promotor nao da!");
+	if(pthread_create(&promotorBF,NULL,&imprimePromotorBF, &a)!=0)
+		printf("promotor BF nao da!");
+*/
+	/*------------------------------------------*/
 
 	int op;
 
@@ -39,12 +137,13 @@ int main(){
 	char palavra[20];
 	int contadorClientes=0, contadorItens=0;
 	contadorClientes = loadUsersFile("./FUSERS.txt");
-	Cliente clientes[contadorClientes];
+	//Cliente clientes[contadorClientes];
 
-	Cliente clientesOnline[contadorClientes];
+	msgBF comunicacao;
+	Cliente clientesOnline[NMAXUSERS];
 	strcpy(clientesOnline[0].nome, "a");
 
-	/* GUARDAR DADOS DO FICHEIRO DE UTILIZADORES NA ESTRUTURA*/
+	/* GUARDAR DADOS DO FICHEIRO DE UTILIZADORES NA ESTRUTURA
 	if (verificaUtilizadores(contadorClientes)==1){
 
 		i=0;
@@ -76,6 +175,7 @@ int main(){
 		}
 		fclose(f);
 	}
+	*/
 	/*----------------------------------------------------------------------------*/
 	
 	/* GUARDAR DADOS DO FICHEIRO DE ITENS NA ESTRUTURA*/
@@ -155,57 +255,19 @@ int main(){
 		sel =select(fd+1, &fds, NULL,NULL, NULL);//bloqueia aqui
 
 		if(sel>0 && FD_ISSET(0, &fds)){	
-
-
-			scanf("%d", &op);
 			
 			
-			
-			
-
-			/*-----------------PROMOTOR-------------------
-				int p_b[2];
-				int size, pid;
-				int estado;	
-
-				pipe(p_b);
-				char  res[100];
-
-				int f = fork();
-				if(f == 0){
-					//filho corre o promotor
-					pid=getpid();
-					close(p_b[0]);
-					close(1);
-					dup(p_b[1]);
-
-					execlp("./promotor_oficial", "promotor_oficial", NULL);
-					exit(-1);
-						
-				}
-					
-				//pai continua a correr
-				close(p_b[1]);
-				size = read(p_b[0], res, 99);
-				res[size] = '\0';
-				printf("Promotor: %s\n", res);
-				close(p_b[0]);
-
-				wait(&estado);
-
-			*/
 
 				char com[50];
 				char stcom[50];
 				char ndcom[50];
 
-				scanf("%s", com);
-
+				fgets(com, 49, stdin);
 
 				int i, j, k;
 				int spaceflag=0;
 
-
+				
 				for(i=1; com[i]!='\0'; i++){
 
 					if(com[i-1]==' ' && com[i]!=' '){
@@ -232,12 +294,18 @@ int main(){
 						for(k=0,j=i+1; com[j]!='\0'; j++, k++){
 							ndcom[k] = com[j];
 						}
+						
 						printf("\nCancelar o promotor %s\n", ndcom);
+						//a.kill=1;
 					}
+					else 
+						printf("\nComando invalido!\n");
 				}
 
 				else{
-					if(strcmp(com,"users")==0){
+					
+
+					if(strcmp(com,"users\n")==0){
 
 						printf("\nLista os utilizadores\n");
 						if(contadorClientes==-1)
@@ -301,6 +369,8 @@ int main(){
 					}
 					else if(strcmp(com,"close")==0){
 						printf("\nA plataforma vai encerrar\n");
+						/*a.kill=1;
+						pthread_join(promotor, NULL);*/
 						exit(-1);
 					}
 					else
@@ -314,42 +384,197 @@ int main(){
 			
 		}
 		else if(sel>0 && FD_ISSET(fd, &fds)){
-			n= read(fd, &utilizador, sizeof(verificaExistencia)); // HA DADOS.... NAO BLOQUEIA
-            printf("\nRecebi...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
 
-			//verifica na estrutura se existe
-			for(int j=0; j<contadorClientes; j++){
-
-				if(strcmp(clientes[j].nome, utilizador.nome)==0 && strcmp(clientes[j].pw, utilizador.pwd)==0){
-					utilizador.validacao=1;
-					
-					//meter utilizador na estrutura online
-					for(int i=0;i<contadorClientes;i++){
-						if(strcmp(clientesOnline[i].nome, "a")==0){
-
-							strcpy(clientesOnline[i].nome, clientes[j].nome);
-							strcpy(clientesOnline[i].pw, clientes[j].pw);
-							clientesOnline[i].saldo=clientes[j].saldo;
-
-							strcpy(clientesOnline[i+1].nome, "a");
-							break;
-						}
-					}
-					break;
-				}
-
-			}
 			
+				if((n= read(fd, &comunicacao, sizeof(msgBF)))>0){ // HA DADOS.... NAO BLOQUEIA
+					printf("Recebi...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
 
-			//enviar resposta
-			sprintf(fifo, FRONTENDFIFO, utilizador.pid);
-			fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
-			n= write(fdr, &utilizador, sizeof(verificaExistencia));
-			close(fdr);
-			printf("Enviei...%s, %s, %d, %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, utilizador.validacao, n);
+					if(comunicacao.codMsg==0){//iniciar sessão
+
+						int estaOnline=0;
+
+						for(int i=0; i<NMAXUSERS; i++){
+							if(strcmp(clientesOnline[i].nome,comunicacao.arg1)==0 && strcmp(clientesOnline[i].pw,comunicacao.arg2)==0){
+								estaOnline=1;
+								break;
+							}
+						}
+						//printf("%d", estaOnline);
+						if(estaOnline==0){
+						//verifica na estrutura se existe
+							if(isUserValid(comunicacao.arg1, comunicacao.arg2)==1){
+									strcpy(comunicacao.arg3, "1");
+									
+
+									//meter utilizador na estrutura online
+									for(int i=0;i<NMAXUSERS;i++){
+										if(strcmp(clientesOnline[i].nome, "a")==0){
+
+											strcpy(clientesOnline[i].nome, comunicacao.arg1);
+											strcpy(clientesOnline[i].pw, comunicacao.arg2);
+											clientesOnline[i].saldo=getUserBalance(comunicacao.arg1);
+											clientesOnline[i].pid=comunicacao.pid;
+
+											if(i<NMAXUSERS-1)
+												strcpy(clientesOnline[i+1].nome, "a");
+
+											break;
+										}
+									}
+									
+								}
+
+							//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
+							}
+							else
+								printf("[ERRO] - ao enviar dados a utilizador");
+						}else{
+							
+							//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
+							}
+							else
+								printf("[ERRO] - ao enviar dados a utilizador");
+						}
+
+					}
+
+					else if(comunicacao.codMsg==1){
+
+					}
+					else if(comunicacao.codMsg==2){
+
+					}
+					else if(comunicacao.codMsg==3){
+						
+
+						
+					}
+					else if(comunicacao.codMsg==4){
+
+						strcpy(comunicacao.arg1, clientesOnline[0].nome);
+						strcpy(comunicacao.arg2, clientesOnline[1].nome);
+
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("Enviei... (%d bytes)\n", n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+
+					}
+					else if(comunicacao.codMsg==5){
+
+					}
+					else if(comunicacao.codMsg==6){
+
+						
+
+					}
+					else if(comunicacao.codMsg==7){
+
+						time_t t = time(NULL);
+						struct tm tm = *localtime(&t);
+
+						sprintf(comunicacao.arg1, "%d-%d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);	//data
+						sprintf(comunicacao.arg2, " %02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);			//hora
+
+
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("Enviei a data e hora para %d(%d bytes)\n", comunicacao.pid, n);
+						}else
+							printf("[ERRO] - ao enviar dados a utilizador");
+
+					}
+					else if(comunicacao.codMsg==8){
+
+					}
+					else if(comunicacao.codMsg==9){
+
+					}
+					else if(comunicacao.codMsg==10){
+
+						int y, saldo;
+						for(y=0; y<NMAXUSERS; y++){
+							if(clientesOnline[y].pid==comunicacao.pid)
+								break;
+							
+						}
+						saldo=getUserBalance(clientesOnline[y].nome);
+
+						if(saldo!=-1){
+							sprintf(comunicacao.arg1,"%d", saldo);
+							printf("%s", comunicacao.arg2);
+							//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
+							}else
+								printf("[ERRO] - ao enviar dados a utilizador");
+						}
+						else{
+							strcpy(comunicacao.arg1, "[ERRO] - Ao procurar o saldo");
+							//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
+							}else
+								printf("[ERRO] - ao enviar dados a utilizador");
+						}
+
+
+
+					}
+					else if(comunicacao.codMsg==11){
+
+						int y, j;
+						for(y=0; y<NMAXUSERS; y++){
+							if(clientesOnline[y].pid==comunicacao.pid)
+								break;
+							
+						}
+						if(y>=0){
+							for (j=y;j<NMAXUSERS; j++)  
+							{  
+								strcpy(clientesOnline[j].nome, clientesOnline[i+1].nome);
+								strcpy(clientesOnline[j].pw, clientesOnline[i+1].pw);
+								clientesOnline[j].saldo=clientesOnline[i+1].saldo;
+								clientesOnline[j].pid=clientesOnline[i+1].pid;  
+
+							} 
+						}
+						else
+							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[i].nome);
+						
+					}
+
+				}else
+					printf("[ERRO] - ao receber dados do utiliziador");
+				
+			
 		}
 
 	}while(1);
 
-
+	
 }

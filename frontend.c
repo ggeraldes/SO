@@ -21,7 +21,9 @@ int main(int argc, char*argv[]){
 		exit(-1);
 	}
 
-	verificaExistencia utilizador;
+	//verificaExistencia utilizador;
+	msgBF comunicacao;
+	respostaBF respostaB;
 	int fd, n, fdr;
 
 	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
@@ -30,8 +32,8 @@ int main(int argc, char*argv[]){
     } 
 
 	//criar fifo FRONTENDFIFO+pid
-	utilizador.pid=getpid();
-	sprintf(fifo, FRONTENDFIFO, utilizador.pid);
+	comunicacao.pid=getpid();
+	sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 	mkfifo(fifo, 0600);
 
 	//Abrir o fifo do backend
@@ -39,23 +41,25 @@ int main(int argc, char*argv[]){
     printf("Abri o fifo do backend - '%s'\n", BACKENDFIFO);
 
 	//meter dados da sessão na estrutura, para enviar ao backend
-	strcpy(utilizador.nome, argv[1]);
-	strcpy(utilizador.pwd, argv[2]);
-	utilizador.validacao=0;
+	comunicacao.codMsg=0;
+	strcpy(comunicacao.arg1, argv[1]);
+	strcpy(comunicacao.arg2, argv[2]);
+	strcpy(comunicacao.arg3, "0");
 
 	//mandar a struct ao backend
-	n=write(fd, &utilizador, sizeof(verificaExistencia));
-	printf("Enviei...%s %s %d (%d bytes)\n", utilizador.nome, utilizador.pwd, utilizador.pid, n);
+	n=write(fd, &comunicacao, sizeof(msgBF));
+	printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
 
 	//receber resposta de validacao do backend
 	fdr= open(fifo, O_RDONLY);
-	n = read(fdr, &utilizador, sizeof(verificaExistencia));
+	n = read(fdr, &comunicacao, sizeof(msgBF));
 	close(fdr);
 
 	
-	
-	if(utilizador.validacao==1)
+	if(atoi(comunicacao.arg3)==1){
 		printf("\nBem vindo!");
+	}
+
 	else{
 		printf("\nUtilizador não encontrado!\n");
 		unlink(fifo);
@@ -92,10 +96,33 @@ int main(int argc, char*argv[]){
 			stcom[i] = '\0';
 
 			if(strcmp(stcom, "lisel")==0){
-				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
+				for(k=0,j=i+1; com[j]!='\n'; j++, k++){
 					ndcom[k] = com[j];
 				}
-				printf("\nListar os itens do utilizador %s\n", ndcom);
+				ndcom[k+1]='\0';
+				strcpy(comunicacao.arg1, ndcom);
+				comunicacao.codMsg=4;
+
+				//mandar a struct ao backend
+				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+				printf("Enviei...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
+				}
+				else
+					printf("[ERRO] - Ao comunicar com o backend\n");
+
+				//receber resposta do backend
+				fdr= open(fifo, O_RDONLY);
+				if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+					close(fdr);
+
+					printf("\nListar os itens do utilizador %s\n", ndcom);
+					printf("%s\n",  comunicacao.arg1);
+					printf("%s",  comunicacao.arg2);
+				}
+				else
+					printf("[ERRO] - Ao receber do backend\n");
+
+
 			}
 
 			else if(strcmp(stcom, "licat")==0){
@@ -179,15 +206,61 @@ int main(int argc, char*argv[]){
 		}
 
 		else if(strcmp(com,"time\n")==0){
-			printf("\nHora atual: \n");
+
+			comunicacao.codMsg=7;
+
+			//mandar a struct ao backend
+			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+			else
+				printf("[ERRO] - Ao comunicar com o backend\n");
+
+			//receber resposta do backend
+			fdr= open(fifo, O_RDONLY);
+			if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+				close(fdr);
+
+				printf("\nHora atual: ");
+				printf("%s", comunicacao.arg1);
+				printf("%s", comunicacao.arg2);
+			}
+			else
+				printf("[ERRO] - Ao receber do backend\n");
 		}
 
 		else if(strcmp(com,"cash\n")==0){
-			printf("\nSaldo atual: \n");
+
+			comunicacao.codMsg=10;
+
+			//mandar a struct ao backend
+			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+			else
+				printf("[ERRO] - Ao comunicar com o backend\n");
+
+			//receber resposta do backend
+			fdr= open(fifo, O_RDONLY);
+			if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+				close(fdr);
+				printf("\nSaldo atual: ");
+				printf("%s €", comunicacao.arg1);
+			}
+			else
+				printf("[ERRO] - Ao receber do backend\n");
 		}
 
 		else if(strcmp(com,"exit\n")==0){
-			exit(-1);
+
+			comunicacao.codMsg=11;
+
+			//mandar a struct ao backend
+			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+				unlink (fifo);
+				exit(-1);
+			}
+			else
+				printf("[ERRO] - Ao comunicar com o backend\n");
 		}
 
 		else
