@@ -289,7 +289,7 @@ int main(){
 						printf("\nBanir o utilizador %s\n", ndcom);
 					}
 
-					else if(strcmp(stcom, "cancel")==0){
+					else if(strcmp(stcom, "cancel\n")==0){
 
 						for(k=0,j=i+1; com[j]!='\0'; j++, k++){
 							ndcom[k] = com[j];
