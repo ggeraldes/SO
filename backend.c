@@ -282,7 +282,7 @@ int main(){
 					}
 					stcom[i] = '\0';
 
-					if(strcmp(stcom, "kick")==0){
+					if(strcmp(stcom, "kick\n")==0){
 						for(k=0,j=i+1; com[j]!='\0'; j++, k++){
 							ndcom[k] = com[j];
 						}
@@ -348,7 +348,7 @@ int main(){
 						}
 
 					}
-					else if(strcmp(com,"list")==0){
+					else if(strcmp(com,"list\n")==0){
 
 						printf("\nLista os itens a venda\n");
 						if(verificaItems(contadorItens)==1){
@@ -361,13 +361,13 @@ int main(){
 							printf("\nNão foram encontrados itens!");
 
 					}
-					else if(strcmp(com,"prom")==0){
+					else if(strcmp(com,"prom\n")==0){
 						printf("\nLista os promotores\n");
 					}
-					else if(strcmp(com,"reprom")==0){
+					else if(strcmp(com,"reprom\n")==0){
 						printf("\nAtualiza os promotores\n");
 					}
-					else if(strcmp(com,"close")==0){
+					else if(strcmp(com,"close\n")==0){
 						printf("\nA plataforma vai encerrar\n");
 						/*a.kill=1;
 						pthread_join(promotor, NULL);*/
