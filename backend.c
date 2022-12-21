@@ -141,6 +141,7 @@ int main(){
 
 	msgBF comunicacao;
 	Cliente clientesOnline[NMAXUSERS];
+	int flagNMax=0;
 	strcpy(clientesOnline[0].nome, "a");
 
 	/* GUARDAR DADOS DO FICHEIRO DE UTILIZADORES NA ESTRUTURA
@@ -228,7 +229,6 @@ int main(){
 
 	/*VALIDACAO DE SESSÕES DO FRONTEND*/
 
-	verificaExistencia utilizador;
 	int fd, n, fdr;
 	int sel, sel1;
 	char fifo[40];
@@ -317,7 +317,7 @@ int main(){
 						else{
 							//int res=0;
 							int g;
-							for(g=0; g<contadorClientes;g++){
+							for(g=0; g<NMAXUSERS;g++){
 
 								if(strcmp(clientesOnline[g].nome, "a")==0)
 								break; 
@@ -399,12 +399,12 @@ int main(){
 								break;
 							}
 						}
-						//printf("%d", estaOnline);
-						if(estaOnline==0){
+						if(estaOnline==0 && flagNMax==0){
 						//verifica na estrutura se existe
+						
 							if(isUserValid(comunicacao.arg1, comunicacao.arg2)==1){
 									strcpy(comunicacao.arg3, "1");
-									
+									printf("%s",comunicacao.arg3);
 
 									//meter utilizador na estrutura online
 									for(int i=0;i<NMAXUSERS;i++){
@@ -414,15 +414,17 @@ int main(){
 											strcpy(clientesOnline[i].pw, comunicacao.arg2);
 											clientesOnline[i].saldo=getUserBalance(comunicacao.arg1);
 											clientesOnline[i].pid=comunicacao.pid;
-
-											if(i<NMAXUSERS-1)
+											if(i<NMAXUSERS-1){
 												strcpy(clientesOnline[i+1].nome, "a");
-
+											}
+											else if (i==NMAXUSERS-1)
+												flagNMax=1;
 											break;
 										}
 									}
-									
-								}
+									sprintf(comunicacao.resposta, "Bem vindo!");
+								}else
+									sprintf(comunicacao.resposta, "Utilizador não existe!");
 
 							//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
@@ -434,7 +436,10 @@ int main(){
 							else
 								printf("[ERRO] - ao enviar dados a utilizador");
 						}else{
-							
+							if(estaOnline==1)
+								sprintf(comunicacao.resposta, "Utilizador já se encntra online!");
+							else if(flagNMax==1)
+								sprintf(comunicacao.resposta, "O número máximo de utilizadores foi atingido!");
 							//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
@@ -487,9 +492,10 @@ int main(){
 
 						time_t t = time(NULL);
 						struct tm tm = *localtime(&t);
-
-						sprintf(comunicacao.arg1, "%d-%d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);	//data
-						sprintf(comunicacao.arg2, " %02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);			//hora
+						char teste[50];
+						
+						sprintf(comunicacao.resposta, "%d-%d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);	//data
+						//strcat(comunicacao.arg1, teste);	//hora
 
 
 						//enviar resposta
@@ -554,15 +560,22 @@ int main(){
 							
 						}
 						if(y>=0){
-							for (j=y;j<NMAXUSERS; j++)  
-							{  
-								strcpy(clientesOnline[j].nome, clientesOnline[i+1].nome);
-								strcpy(clientesOnline[j].pw, clientesOnline[i+1].pw);
-								clientesOnline[j].saldo=clientesOnline[i+1].saldo;
-								clientesOnline[j].pid=clientesOnline[i+1].pid;  
-
+							for (j=y;j<NMAXUSERS; j++){  
+								if(strcmp(clientesOnline[i+1].nome, "a")==0)
+									break;
+								if(j+1<NMAXUSERS){
+									strcpy(clientesOnline[j].nome, clientesOnline[j+1].nome);
+									strcpy(clientesOnline[j].pw, clientesOnline[j+1].pw);
+									clientesOnline[j].saldo=clientesOnline[j+1].saldo;
+									clientesOnline[j].pid=clientesOnline[j+1].pid;
+								}
+								else if(j==NMAXUSERS-1  && flagNMax==1){
+									strcpy(clientesOnline[j].nome, "a");
+									flagNMax=0;
+								}
 							} 
 						}
+						
 						else
 							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[i].nome);
 						

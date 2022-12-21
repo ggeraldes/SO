@@ -23,7 +23,9 @@
 #define FRONTENDFIFO "CLIENTE%d"
 char CLIENTE_FIFO_FINAL[100];
 
-#define NMAXUSERS 20
+#define NMAXUSERS 2
+#define NMAXPROMOS 2
+#define NMAXITEMS 2
 
 
 
@@ -32,12 +34,6 @@ typedef struct{				//serve para parar a thread do promotor
 	int kill;				//kill=0, thread continua; kill=1, thread termina
 }killThread;				
 
-typedef struct{				//--------------VALIDAÇÃO DA SESSÃO------------------
-	char nome[20];			//caso esteja no ficheiro FUSERS.txt validacao=1, se não validacao=0
-	char pwd[20];
-	int pid;
-	int validacao;
-}verificaExistencia;
 
 
 typedef struct{			   //-------------------COMUNICAÇÃO BACKEND-FRONTEND-------------------------
@@ -47,7 +43,7 @@ typedef struct{			   //-------------------COMUNICAÇÃO BACKEND-FRONTEND--------
 	char arg2[20];	
 	char arg3[20];
 	char arg4[20];
-	char arg5[20];	   	
+	char resposta[500];	   	
 }msgBF;
 
 typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------------------

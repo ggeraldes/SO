@@ -42,26 +42,32 @@ int main(int argc, char*argv[]){
 
 	//meter dados da sessão na estrutura, para enviar ao backend
 	comunicacao.codMsg=0;
+
 	strcpy(comunicacao.arg1, argv[1]);
 	strcpy(comunicacao.arg2, argv[2]);
+	
 	strcpy(comunicacao.arg3, "0");
 
 	//mandar a struct ao backend
-	n=write(fd, &comunicacao, sizeof(msgBF));
-	printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
+	if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+	printf("Enviei...%d %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, comunicacao.arg3, n);
+	}else
+		printf("[ERRO] - Ao comunicar com o backend\n");
 
 	//receber resposta de validacao do backend
 	fdr= open(fifo, O_RDONLY);
-	n = read(fdr, &comunicacao, sizeof(msgBF));
+	if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0)
 	close(fdr);
+	else
+		printf("[ERRO] - Ao receber do backend\n");
 
 	
 	if(atoi(comunicacao.arg3)==1){
-		printf("\nBem vindo!");
+		printf("\n%s",comunicacao.resposta);
 	}
 
 	else{
-		printf("\nUtilizador não encontrado!\n");
+		printf("\n%s\n", comunicacao.resposta);
 		unlink(fifo);
 		close(fd);
 		exit (1);
@@ -221,8 +227,7 @@ int main(int argc, char*argv[]){
 				close(fdr);
 
 				printf("\nHora atual: ");
-				printf("%s", comunicacao.arg1);
-				printf("%s", comunicacao.arg2);
+				printf("%s", comunicacao.resposta);
 			}
 			else
 				printf("[ERRO] - Ao receber do backend\n");
