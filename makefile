@@ -24,7 +24,7 @@ clean:
 cleanB:
 	rm BACKENDFIFO
 
-cleanCF:
+cleanC:
 	rm CLIENTE[[:digit:]]*
 
 	

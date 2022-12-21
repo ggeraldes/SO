@@ -20,7 +20,7 @@ int main(int argc, char*argv[]){
 		printf("\nPor favor indique o seu nome e a sua password!\n");
 		exit(-1);
 	}
-
+	
 	//verificaExistencia utilizador;
 	msgBF comunicacao;
 	respostaBF respostaB;
@@ -155,11 +155,39 @@ int main(int argc, char*argv[]){
 			}
 
 			else if(strcmp(stcom, "add")==0){
-				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
+				for(k=0,j=i+1; com[j]!='\n'; j++, k++){
 					ndcom[k] = com[j];
 				}
-				int valtime = atoi(ndcom);
-				printf("\nAdicionou %d ao saldo atual\n", valtime);
+				ndcom[k+1] = '\0';
+				int valof = atoi(ndcom);
+
+				if(valof>0){
+					comunicacao.codMsg=10;
+					strcpy(comunicacao.arg1,ndcom);
+
+					//mandar a struct ao backend
+					if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+					printf("Enviei...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
+					}
+					else
+						printf("[ERRO] - Ao comunicar com o backend\n");
+
+					//receber resposta do backend
+					fdr= open(fifo, O_RDONLY);
+					if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+						close(fdr);
+						printf("%s\n",  comunicacao.resposta);
+					}
+					else
+						printf("[ERRO] - Ao receber do backend\n");
+
+
+
+				}
+					
+				else
+					printf("\nIndique um valor válido");
+
 			}
 
 			else if(strcmp(stcom, "buy")==0){
@@ -170,8 +198,8 @@ int main(int argc, char*argv[]){
 				for(k=0,j+=1; com[j]!='\0'; j++, k++){
 					rdcom[k] = com[j];
 				}
-				int valof = atoi(rdcom);
-				printf("\nComprar o item com id %d que custa %d\n", id, valof);
+				
+				
 			}
 
 			else if(strcmp(stcom, "sell")==0){
@@ -235,7 +263,7 @@ int main(int argc, char*argv[]){
 
 		else if(strcmp(com,"cash\n")==0){
 
-			comunicacao.codMsg=10;
+			comunicacao.codMsg=9;
 
 			//mandar a struct ao backend
 			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
