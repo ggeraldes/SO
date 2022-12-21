@@ -48,7 +48,7 @@ void *imprimePromotor(void *a){
 				while((size = read(p_b[0], res, 99))>0 && ta->kill!=1){
 					res[size] = '\0';
 					if(strcmp(res,"\n")!=0)
-						printf("Promotor: %s\n", res);
+						printf("\nPromotor: %s", res);
 
 				}
 				close(p_b[0]);
@@ -90,7 +90,8 @@ void *imprimePromotorBF(void *a){
 				while((size = read(p_b[0], res, 99))>0 && ta->kill!=2){
 					res[size] = '\0';
 					if(strcmp(res,"\n")!=0)
-						printf("Promotor BF: %s\n", res);
+						printf("\nPromotor BF: %s", res);
+
 
 				}
 				close(p_b[0]);
@@ -118,7 +119,7 @@ int main(){
     sa.sa_sigaction=handler_sigalarm;
     sigaction(SIGINT, &sa, NULL);
 
-	/*------------thread promotor---------------
+	/*------------thread promotor---------------*/
 	killThread a;
 	pthread_t promotor;
 	pthread_t promotorBF;
@@ -127,7 +128,7 @@ int main(){
 		printf("promotor nao da!");
 	if(pthread_create(&promotorBF,NULL,&imprimePromotorBF, &a)!=0)
 		printf("promotor BF nao da!");
-*/
+
 	/*------------------------------------------*/
 
 	int op;
@@ -282,21 +283,51 @@ int main(){
 					}
 					stcom[i] = '\0';
 
-					if(strcmp(stcom, "kick\n")==0){
-						for(k=0,j=i+1; com[j]!='\0'; j++, k++){
+					if(strcmp(stcom, "kick")==0){
+						for(k=0,j=i+1; com[j]!='\n'; j++, k++){
 							ndcom[k] = com[j];
 						}
+						ndcom[k+1]='\0';
+
+						int g;
+						for(g=0; g<NMAXUSERS;g++){
+
+							if(strcmp(clientesOnline[g].nome, "a")==0)
+								break; 
+							else if(strcmp(ndcom, clientesOnline[g].nome)==0){
+
+								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, clientesOnline[g].saldo);
+								break;
+							}
+								
+						}
+						if(g==0)
+							printf("Sem utilizadores online!\n");
+							
+
 						printf("\nBanir o utilizador %s\n", ndcom);
 					}
 
 					else if(strcmp(stcom, "cancel")==0){
 
-						for(k=0,j=i+1; com[j]!='\0'; j++, k++){
+						for(k=0,j=i+1; com[j]!='\n'; j++, k++){
 							ndcom[k] = com[j];
 						}
+						ndcom[k+1]='\0';
+						//printf("!%d!", strcmp(ndcom, "promotor"));
+						if(strcmp(ndcom, "promotor")==0){
+
+							printf("\nCancelei o promotor '%s'", ndcom);
+							a.kill=1;
+
+						}else if(strcmp(ndcom, "promotorBF")==0){
+
+							printf("\nCancelei o promotor '%s'", ndcom);
+							a.kill=2;
+						}else{
+							printf("\nPromotor '%s' não existe!", ndcom);
+						}
 						
-						printf("\nCancelar o promotor %s\n", ndcom);
-						//a.kill=1;
 					}
 					else 
 						printf("\nComando invalido!\n");
@@ -323,27 +354,11 @@ int main(){
 								break; 
 								else
 								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, clientesOnline[g].saldo);
-								/*
-								res = updateUserBalance(clientes[g].nome, clientes[g].saldo-1);
 								
-								if(res==-1)
-								printf("\n[ERROR]-updateUserBalance\n");
-								else if(res==0)
-								printf("\nUtilizador não encontrado\n");
-								else
-								clientes[g].saldo-=1;
-								*/
 							}
 							if(g==0)
 								printf("Sem utilizadores online!\n");
-							/*
-							res=saveUsersFile("FUSERS.txt");
-							if(res==0)
-							printf("\nUtilizador guardados com sucesso\n");
-							else 
-							printf("\n[ERROR]-saveUsersFile\n");
-
-							*/
+							
 
 						}
 
@@ -361,16 +376,21 @@ int main(){
 							printf("\nNão foram encontrados itens!");
 
 					}
-					else if(strcmp(com,"prom\n")==0){
+					else if(strcmp(com,"prom")==0){
 						printf("\nLista os promotores\n");
 					}
-					else if(strcmp(com,"reprom\n")==0){
+					else if(strcmp(com,"reprom")==0){
 						printf("\nAtualiza os promotores\n");
 					}
 					else if(strcmp(com,"close\n")==0){
 						printf("\nA plataforma vai encerrar\n");
-						/*a.kill=1;
-						pthread_join(promotor, NULL);*/
+						for(int m=0; m<2; m++){
+							if(m==0)
+							a.kill=1;
+							if(m==1)	
+							a.kill=2;
+						}
+						unlink(BACKENDFIFO);
 						exit(-1);
 					}
 					else
@@ -513,9 +533,6 @@ int main(){
 					}
 					else if(comunicacao.codMsg==9){
 
-					}
-					else if(comunicacao.codMsg==10){
-
 						int y, saldo;
 						for(y=0; y<NMAXUSERS; y++){
 							if(clientesOnline[y].pid==comunicacao.pid)
@@ -548,6 +565,43 @@ int main(){
 								printf("[ERRO] - ao enviar dados a utilizador");
 						}
 
+					}
+					else if(comunicacao.codMsg==10){
+
+							int saldo=0;
+							int g, verUpdate=0;
+							saldo=atoi(comunicacao.arg1);
+							if(saldo>0){
+								
+								for(g=0;g<NMAXUSERS;g++){
+
+									if(clientesOnline[g].pid==comunicacao.pid){
+										
+										updateUserBalance(clientesOnline[g].nome, getUserBalance(clientesOnline[g].nome)+saldo);
+										clientesOnline[g].saldo=getUserBalance(clientesOnline[g].nome);
+										verUpdate=1;
+										break;
+
+									}
+
+
+								}
+								saveUsersFile("FUSERS.txt");
+								if(verUpdate==1){
+									sprintf(comunicacao.resposta, "Atualizado com sucesso!");
+								}else
+									sprintf(comunicacao.resposta, "[ERRO] - Ao atualizar!");
+
+							}else
+								sprintf(comunicacao.resposta, "[ERRO] - Valor não permitido!");
+							//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
+							}else
+								printf("[ERRO] - ao enviar dados a utilizador");
 
 
 					}
