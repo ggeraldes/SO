@@ -5,21 +5,21 @@
 int flagNMaxI=0;
 char fifo[40];
 
-void enviaMensagemU(void *a, msgBF b, char resposta[]){
 
-	int fdr, n;
-	Cliente *clientesOnline = (Cliente*) a;
-	strcpy(b.resposta, resposta);
-	b.codMsg=12;
+void enviaMensagemU(Cliente clientesOnline[], char resposta[]){
+
+	int fdr, n, fd;
+	strcpy(envia.resposta, resposta);
 	for(int i=0; i<NMAXUSERS && strcmp(clientesOnline[i].nome, "a")!=0; i++){
 		sprintf(fifo, FRONTENDFIFO, clientesOnline[i].pid);
-		fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
-			if((n= write(fdr, &b, sizeof(msgBF)))>0){
+		fdr = open(fifo, O_RDWR);  //bloqueia - se não houver clientes
+			if((n= write(fdr, &envia, sizeof(respostaBF)))>0){
 				close(fdr);
 				printf("Enviei... (%d bytes)\n", n);
 			}
 			else
 				printf("[ERRO] - ao enviar dados a utilizador");
+			
 	}
 
 }
@@ -71,11 +71,8 @@ void *imprimePromotor(void *a){
 				
 				while((size = read(p_b[0], res, 99))>0 && ta->kill!=1){
 					res[size] = '\0';
-					if(strcmp(res,"\n")!=0){
+					if(strcmp(res,"\n")!=0)
 						printf("\nPromotor: %s", res);
-
-
-					}
 
 				}
 				close(p_b[0]);
@@ -160,6 +157,14 @@ int main(char *envp[]){
 	int op;
 
 	int space=0;
+	char arg1[20];
+	char arg2[20];
+	char arg3[20];
+	char arg4[20];
+	char arg5[20];
+	char arg6[20];
+	int b=0, c=0;
+
 	char mensagemG[100];
 	char filePName[30];
 	sprintf(filePName,"./%s",fusers);
@@ -175,8 +180,8 @@ int main(char *envp[]){
 	
 	/*------------GUARDAR DADOS DO FICHEIRO DE ITENS NA ESTRUTURA-----------------*/
 	
-	int i=0, count=9;
-	char c;
+	int i=0, count=8;
+	char cEnd;
 	int ch=0;
 	char palavra[20];
 
@@ -184,33 +189,31 @@ int main(char *envp[]){
 	Leilao temp[NMAXITEMS]; //para envios expecificos
 	FILE *f = fopen(fitems, "r");
 
-	while((c = fgetc(f))!= EOF){
-		ungetc (c,f);
+	while((cEnd = fgetc(f))!= EOF){
+		ungetc (cEnd,f);
 			
 		while(fscanf(f, "%19s", palavra)==1){
 			
-			if(count==9)
+			if(count==8)
 				items[i].ID=atoi(palavra);
-			else if(count==8)
-				strcpy(items[i].nome, palavra);
 			else if(count==7)
-				strcpy(items[i].categoria, palavra);
+				strcpy(items[i].nome, palavra);
 			else if(count==6)
-				items[i].valbase=atoi(palavra);
+				strcpy(items[i].categoria, palavra);
 			else if(count==5)
-				items[i].valcp=atoi(palavra);
+				items[i].valbase=atoi(palavra);
 			else if(count==4)
-				items[i].duracao=atoi(palavra);
+				items[i].valcp=atoi(palavra);
 			else if(count==3)
-				strcpy(items[i].nomeVend,palavra);
+				items[i].duracao=atoi(palavra);
 			else if(count==2)
-				strcpy(items[i].nomeLic,palavra);
+				strcpy(items[i].nomeVend,palavra);
 			else if(count==1)
-				items[i].valLic=atoi(palavra);
+				strcpy(items[i].nomeLic,palavra);
 			if (count!=1)
 				count--;
 			else{
-				count=9;
+				count=8;
 				i++;
 				contadorItens++;
 			}		
@@ -234,7 +237,7 @@ int main(char *envp[]){
 
 	/*-----------------------------Interação com o cliente------------------------*/
 
-	int fd, n, fdr;
+	int fd, n, fdr, fd1;
 	int sel, sel1;
 	
 	fd_set fds;
@@ -247,12 +250,14 @@ int main(char *envp[]){
 	fd = open(BACKENDFIFO, O_RDWR);  //bloqueia - se não houver clientes
     	printf("Abri o fifo '%s'\n", BACKENDFIFO); //acrescentar ao nome do fifo, o pid para saber a que utilizador enviar a resposta
 
+	
+
 	/*----------------------------------------------------------------------------*/
 	do{
 
 
 		
-		printf("\n<COMANDO>\n>");
+		printf("<COMANDO>\n>");
 		fflush(stdout);
 
 		FD_ZERO(&fds);        // limpa o fds
@@ -342,8 +347,8 @@ int main(char *envp[]){
 						if(verificaItems(contadorItens)==1){
 							for(int g=0; strcmp(items[g].nome, "a")!=0 && g<NMAXITEMS;g++){
 								printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", items[g].ID, items[g].nome, items[g].categoria, items[g].valbase, items[g].valcp, items[g].duracao, items[g].nomeVend);
-								if(items[g].valLic!=0)
-									printf(", ult.Lic.: %s, valor Lic.: %d€.", items[g].nomeLic, items[g].valLic);
+								if(strcmp(items[g].nomeLic, "-")!=0)
+									printf(", ult.Lic.: %s", items[g].nomeLic);
 								else
 									printf(", ainda sem licitacoes.");
 							}
@@ -386,26 +391,24 @@ int main(char *envp[]){
 
 					if(comunicacao.codMsg==0){//iniciar sessão
 
-						char arg1[20];
-						char arg2[20];
 						space=0;
-						int a=0;
-						int b=0;
-						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+						b=0; 
+						c=0;
+						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, c++){
 							if(comunicacao.mensagem[i]==' '){
 								space+=1;
-								b=a;
-								a=-1;
+								b=c;
+								c=-1;
 							}
 							else{
 								if(space==0)
-									arg1[a]=comunicacao.mensagem[i];
+									arg1[c]=comunicacao.mensagem[i];
 								if(space==1){
 									arg1[b]='\0';
-									arg2[a]=comunicacao.mensagem[i];
+									arg2[c]=comunicacao.mensagem[i];
 								}
 							}		
-						}arg2[a]='\0';
+						}arg2[c]='\0';
 
 						int estaOnline=0;
 
@@ -473,33 +476,35 @@ int main(char *envp[]){
 
 						if(flagNMaxI!=1){
 
-							char arg1[20];
-							char arg2[20];
-							char arg3[20];
-							char arg4[20];
-							char arg5[20];
-							char arg6[20];
 							space=0;
-							for(int i=0, a=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+							b=0; 
+							c=0;
+							for(int i=0; comunicacao.mensagem[i] != '\0'; i++, c++){
 								if(comunicacao.mensagem[i]==' '){
 									space++;
-									a=-1;
+									b=c;
+									c=-1;
 								}
 								else{
 									if(space==0)
-										arg1[a]=comunicacao.mensagem[i];
-									if(space==1)
-										arg2[a]=comunicacao.mensagem[i];
-									if(space==2)
-										arg3[a]=comunicacao.mensagem[i];
-									if(space==3)
-										arg4[a]=comunicacao.mensagem[i];
-									if(space==4)
-										arg5[a]=comunicacao.mensagem[i];
-									if(space==5)
-										arg6[a]=comunicacao.mensagem[i];
+										arg1[c]=comunicacao.mensagem[i];
+									if(space==1){
+										arg1[c]='\0';
+										arg2[c]=comunicacao.mensagem[i];}
+									if(space==2){
+										arg2[b]='\0';
+										arg3[c]=comunicacao.mensagem[i];}
+									if(space==3){
+										arg3[b]='\0';
+										arg4[c]=comunicacao.mensagem[i];}
+									if(space==4){
+										arg4[b]='\0';
+										arg5[c]=comunicacao.mensagem[i];}
+									if(space==5){
+										arg5[b]='\0';
+										arg6[c]=comunicacao.mensagem[i];}
 								}
-							}
+							}arg6[c]='\0';
 							
 							if(atoi(arg3)>0 && atoi(arg4)>0 && atoi(arg5)>0){
 
@@ -513,7 +518,6 @@ int main(char *envp[]){
 										items[i].duracao=atoi(arg5);
 										strcpy(items[i].nomeVend, arg6);
 										strcpy(items[i].nomeLic, "-");
-										items[i].valLic= atoi("-");
 										if(i<NMAXITEMS-1)
 											strcpy(items[i+1].nome,"a");
 										else if(i==NMAXITEMS-1){
@@ -582,7 +586,6 @@ int main(char *envp[]){
 						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
 							if(strcmp(items[i].nomeVend, comunicacao.mensagem)==0){
 								temp[y]=items[i];
-								printf("!%s!", temp[y].nome);
 								y++;
 							}
 						}
@@ -670,37 +673,36 @@ int main(char *envp[]){
 					}
 					else if(comunicacao.codMsg==8){
 
-						char arg1[20];
-						char arg2[20];
-						char arg3[20];
-						int b=0;
-						int a=0;
+						
+						b=0; 
+						c=0;
 						space=0;
-						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+						int valido=0;
+						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, c++){
 							if(comunicacao.mensagem[i]==' '){
 								space++;
-								b=a;
-								a=-1;
+								b=c;
+								c=-1;
 							}
 							else{
 								if(space==0){
-									arg1[a]=comunicacao.mensagem[i];
+									arg1[c]=comunicacao.mensagem[i];
 								}
 								if(space==1){
 									arg1[b]='\0';
-									arg2[a]=comunicacao.mensagem[i];
+									arg2[c]=comunicacao.mensagem[i];
 								}
 								if(space==2){
 									arg2[b]='\0';
-									arg3[a]=comunicacao.mensagem[i];
+									arg3[c]=comunicacao.mensagem[i];
 								}
 							}
-						}arg3[a]='\0';
+						}arg3[c]='\0';
 						
 						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
 							if(items[i].ID == atoi(arg1)){
-								
 								if(items[i].valcp==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
+									
 									updateUserBalance(arg3, getUserBalance(arg3)-items[i].valcp);
 									updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+items[i].valcp);
 									for (int y = i; y<NMAXITEMS && strcmp(items[y].nome, "a")!=0; y++) { //apagar o item da estrutura
@@ -712,25 +714,41 @@ int main(char *envp[]){
 											break;
 										}
                 					}
-
+									
 									strcpy(comunicacao.resposta, "Comprado pelo VC com sucesso!");
-									sprintf(mensagemG, "O produto com ID=%d foi comprado pelo utilizador '%s' por %d€", items[i].valcp, arg3, atoi(arg2));
-									enviaMensagemU(&clientesOnline, comunicacao, mensagemG);
+									sprintf(mensagemG, "O produto com ID=%d foi comprado pelo utilizador '%s' por %d€", items[i].ID, arg3, atoi(arg2));
+									valido=1;
 									break;
 								}
 								else if(items[i].valbase<atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //licitacao do produto
 									strcpy(items[i].nomeLic,arg3);
-									items[i].valLic=atoi(arg2);
+									items[i].valbase=atoi(arg2);
 
 									strcpy(comunicacao.resposta, "Produto Licitado com sucesso!");
+									sprintf(mensagemG, "paaaaaaaaaaaaaaaaaaaaaaaaaa %d", atoi(arg2));
+									valido=1;
 									break;
 								}else
 									strcpy(comunicacao.resposta, "Nao tem fundos necessários!");
-
+								break;
 							}else
 								strcpy(comunicacao.resposta, "O produto mencionado nao existe!");
 						}
 						saveUsersFile(fusers);
+
+						//enviar resposta
+							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+								close(fdr);
+								printf("Enviei..%d (%d bytes)\n", comunicacao.pid, n);
+							}else
+								printf("[ERRO] - ao enviar dados a utilizador");
+
+						if(valido==1){
+
+							enviaMensagemU(clientesOnline, mensagemG);
+						}
 
 					}
 					else if(comunicacao.codMsg==9){

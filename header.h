@@ -1,6 +1,6 @@
 //===================== HEADER =====================//
 
-#ifndef _HEADER_H_
+#ifndef _HEADER_H_BACKENDFIFO
 
 #include<stdio.h>
 #include<unistd.h>
@@ -47,8 +47,9 @@ typedef struct{			   		//-------------------COMUNICAÇÃO BACKEND-FRONTEND------
 }msgBF;
 
 typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------------------
-	char resposta[50];   	
+	char resposta[100];  	
 }respostaBF;
+respostaBF envia;
 
 typedef struct cliente{
 	char nome[20];
@@ -65,7 +66,6 @@ typedef struct leilao{
 	int duracao;
 	char nomeVend[20];
 	char nomeLic[20];
-	int valLic;
 }Leilao;
 
 /*typedef struct promotor{
