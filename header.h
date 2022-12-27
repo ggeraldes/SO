@@ -20,30 +20,30 @@
 #include "users_lib.h"
 
 #define BACKENDFIFO "BACKENDFIFO"
+#define BACKENDFIFOG "BACKENDFIFOG"
 #define FRONTENDFIFO "CLIENTE%d"
 char CLIENTE_FIFO_FINAL[100];
 
 #define NMAXUSERS 2
 #define NMAXPROMOS 2
-#define NMAXITEMS 2
+#define NMAXITEMS 5
 
 
 
 
 typedef struct{				//serve para parar a thread do promotor
 	int kill;				//kill=0, thread continua; kill=1, thread termina
+	char nomePromotor[30];
 }killThread;				
 
 
 
-typedef struct{			   //-------------------COMUNICAÇÃO BACKEND-FRONTEND-------------------------
-	int codMsg;            //cod=0(para iniciar sessao), cod=1 (para sell), cod=2 (para list), 
-	int pid;			   //cod=3 (para licat), cod=4 (para lisel), cod=5 (para lival), cod=6 (para litime), 
-	char arg1[20];		   //cod=7 (para time), cod=8 (para buy), cod=9 (para cash), cod=10 (para add), cod=11 (para exit)
-	char arg2[20];	
-	char arg3[20];
-	char arg4[20];
-	char resposta[500];	   	
+typedef struct{			   		//-------------------COMUNICAÇÃO BACKEND-FRONTEND-------------------------
+	int codMsg;            		//cod=0(para iniciar sessao), cod=1 (para sell), cod=2 (para list), 
+	int pid;			   		//cod=3 (para licat), cod=4 (para lisel), cod=5 (para lival), cod=6 (para litime), 
+	char mensagem[200];		    //cod=7 (para time), cod=8 (para buy), cod=9 (para cash), cod=10 (para add), cod=11 (para exit)
+	char arg3[20];				// valida a sessao
+	char resposta[100];	   	
 }msgBF;
 
 typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------------------
@@ -53,28 +53,28 @@ typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------
 typedef struct cliente{
 	char nome[20];
 	char pw[20];	     //password
-	int saldo;
 	int pid;
 }Cliente;
 
-typedef struct item{
+typedef struct leilao{
 	int ID;
 	char nome[20];
 	char categoria[20];
 	int valbase;         //valor base
 	int valcp;           //valor "comprar já"
-}Item;
-
-typedef struct leilao{
-	Item item;
-	bool promocao;
+	int duracao;
+	char nomeVend[20];
+	char nomeLic[20];
+	int valLic;
 }Leilao;
 
+/*typedef struct promotor{
+	Item item;
+	bool promocao;
+}Promotor;
 
-//---------------hora-------------------
-char traco='-';
-char pontos=':';
-char espaco=' ';
+Promotor ativos[NMAXPROMOS];*/
+
 
 
 

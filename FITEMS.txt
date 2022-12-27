@@ -1,4 +1,4 @@
-1 consola eletronica 100 300
-2 prato cozinha 5 20
-3 cadeira casa 30 50
-4 agrafador papelaria 5 15
+1 consola eletronica 100 300 150 geraldes geraldes 20
+2 prato cozinha 5 20 150 pedro - -
+4 garfo cozinha 5 20 150 pedro - -
+5 mesa sala 5 20 150 geraldes pedro 30

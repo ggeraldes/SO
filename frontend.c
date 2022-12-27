@@ -20,6 +20,8 @@ int main(int argc, char*argv[]){
 		printf("\nPor favor indique o seu nome e a sua password!\n");
 		exit(-1);
 	}
+
+	
 	
 	//verificaExistencia utilizador;
 	msgBF comunicacao;
@@ -37,20 +39,18 @@ int main(int argc, char*argv[]){
 	mkfifo(fifo, 0600);
 
 	//Abrir o fifo do backend
-	fd = open(BACKENDFIFO, O_WRONLY);
+	fd = open(BACKENDFIFO, O_RDWR);
     printf("Abri o fifo do backend - '%s'\n", BACKENDFIFO);
 
 	//meter dados da sessão na estrutura, para enviar ao backend
 	comunicacao.codMsg=0;
-
-	strcpy(comunicacao.arg1, argv[1]);
-	strcpy(comunicacao.arg2, argv[2]);
+	sprintf(comunicacao.mensagem, "%s %s", argv[1], argv[2]);
 	
 	strcpy(comunicacao.arg3, "0");
 
 	//mandar a struct ao backend
 	if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-	printf("Enviei...%d %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, comunicacao.arg3, n);
+	printf("Enviei...%d %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.mensagem, comunicacao.pid, comunicacao.arg3, n);
 	}else
 		printf("[ERRO] - Ao comunicar com o backend\n");
 
@@ -73,6 +73,9 @@ int main(int argc, char*argv[]){
 		exit (1);
 	} 
 
+
+	Leilao temp[NMAXITEMS];
+
 	char com[50];    //comando do utilizador
 	char stcom[50];  //primeira parte do comando do utilizador
 	char ndcom[50];  //segunda parte do comando do utilizador (utilizada nos comandos licat, lisel, lival, litime, add)
@@ -82,37 +85,491 @@ int main(int argc, char*argv[]){
 	char dur[10];
 	fflush(stdin);
 
+	fd_set fds;
+	int sel;
+
 	do{
 		printf("\nComando: ");
-		fgets(com, 49, stdin);
-		int i, j, k;
-		int spaceflag=0;
+		fflush(stdout);
 
-		for(i=1; com[i]!='\0'; i++){
-			if(com[i-1]==' ' && com[i]!=' '){
-				spaceflag=1;
-				break;
-			}
-		}
+		/*FD_ZERO(&fds);        // limpa o fds
+        FD_SET(0, &fds);      // adiciona o stdin
+        FD_SET(fdr, &fds);     // adiciona o fdr
 
-		if(spaceflag==1){
-			for(i=0; com[i]!= ' '; i++){
-				stcom[i] = com[i];
-			}
-			stcom[i] = '\0';
+		sel =select(fdr+1, &fds, NULL,NULL, NULL);//bloqueia aqui
+		
+		if(sel>0 && FD_ISSET(0, &fds)){	*/
 
-			if(strcmp(stcom, "lisel")==0){
-				for(k=0,j=i+1; com[j]!='\n'; j++, k++){
-					ndcom[k] = com[j];
+			fgets(com, 49, stdin);
+
+			int i, j, k;
+			int spaceflag=0;
+
+			for(i=1; com[i]!='\0'; i++){
+				if(com[i-1]==' ' && com[i]!=' '){
+					spaceflag=1;
+					break;
 				}
-				ndcom[k+1]='\0';
-				strcpy(comunicacao.arg1, ndcom);
-				comunicacao.codMsg=4;
+			}
+
+			if(spaceflag==1){
+				for(i=0; com[i]!= ' '; i++){
+					stcom[i] = com[i];
+				}
+				stcom[i] = '\0';
+
+				if(strcmp(stcom, "lisel")==0){
+
+					comunicacao.codMsg=4;
+
+					int space=0;
+					int ERROARG=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+									}
+								}
+								ndcom[a]='\0';
+
+					if(space==1 && ERROARG!=1){
+						strcpy(comunicacao.mensagem, ndcom);
+
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+						printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+						}
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						
+						if((n = read(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+
+							printf("\nListar os itens do utilizador '%s':\n", ndcom);
+							int g=0;
+							for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+									if(temp[g].valLic!=0)
+										printf(", ult.Lic.: %s, valor Lic.: %d€.", temp[g].nomeLic, temp[g].valLic);
+									else
+										printf(", ainda sem licitacoes.");
+								}
+								if(g==0)
+									printf("O vendedor '%s' não tem produtos em leilao\n", ndcom);
+							strcpy(temp[0].nome, "a");
+						}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+					}
+					else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+
+
+				}
+
+				else if(strcmp(stcom, "licat")==0){
+
+					comunicacao.codMsg=3;
+
+
+					int space=0;
+					int ERROARG=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+									}
+								}
+								ndcom[a]='\0';
+
+					if(space==1 && ERROARG!=1){
+						strcpy(comunicacao.mensagem, ndcom);
+
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+						printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+						}
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+
+							printf("\nListar os itens da categoria '%s':\n", ndcom);
+
+							int g=0;
+							for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+									if(temp[g].valLic!=0)
+										printf(", ult.Lic.: %s, valor Lic.: %d€.", temp[g].nomeLic, temp[g].valLic);
+									else
+										printf(", ainda sem licitacoes.");
+								}
+								if(g==0)
+									printf("Não existem produtos da categoria '%s' de momento\n", ndcom);
+							strcpy(temp[0].nome, "a");
+						}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+
+						
+					}
+					else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+				}
+
+				else if(strcmp(stcom, "lival")==0){
+
+					comunicacao.codMsg=5;
+
+					int space=0;
+					int ERROARG=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+									}
+								}
+								ndcom[a]='\0';
+
+					if(space==1 && ERROARG!=1 && atoi(ndcom)>0){
+						strcpy(comunicacao.mensagem, ndcom);
+
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+						printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+						}
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+
+							printf("\nListar os itens cujo o valor máx. é %s€:\n", ndcom);
+
+							int g=0;
+							for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+									if(temp[g].valLic!=0)
+										printf(", ult.Lic.: %s, valor Lic.: %d€.", temp[g].nomeLic, temp[g].valLic);
+									else
+										printf(", ainda sem licitacoes.");
+								}
+								if(g==0)
+									printf("Não existem produtos cujo o valor máx. é %s€\n", ndcom);
+							strcpy(temp[0].nome, "a");
+						}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+
+						
+					}
+					else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+				}
+
+				else if(strcmp(stcom, "litime")==0){
+					comunicacao.codMsg=6;
+
+					int space=0;
+					int ERROARG=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+									}
+								}
+								ndcom[a]='\0';
+
+					if(space==1 && ERROARG!=1 && atoi(ndcom)>0){
+						strcpy(comunicacao.mensagem, ndcom);
+
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+						printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+						}
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+
+							printf("\nListar os itens com prazo max. de %ss:\n", ndcom);
+
+							int g=0;
+							for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+									if(temp[g].valLic!=0)
+										printf(", ult.Lic.: %s, valor Lic.: %d€.", temp[g].nomeLic, temp[g].valLic);
+									else
+										printf(", ainda sem licitacoes.");
+								}
+								if(g==0)
+									printf("Não existem produtos com prazo max: de %ss\n", ndcom);
+							strcpy(temp[0].nome, "a");
+						}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+
+						
+					}
+					else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+				}
+
+				else if(strcmp(stcom, "add")==0){
+
+					comunicacao.codMsg=10;
+					
+					int space=0;
+					int ERROARG=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+									}
+								}
+								ndcom[a]='\0';
+
+					if(space==1 && ERROARG!=1 && atoi(ndcom)>0){
+						strcpy(comunicacao.mensagem, ndcom);
+						
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+						printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+						}
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("%s\n",  comunicacao.resposta);
+						}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+					}	
+					else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+
+				}
+
+				else if(strcmp(stcom, "buy")==0){
+
+					comunicacao.codMsg=8;
+
+					int space=0;
+					int ERROARG=0;
+					int b=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										b=a;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+										if(space==2){
+											ndcom[b]='\0';
+											rdcom[a]=com[i];	
+										}
+									}
+								}rdcom[a]='\0';
+								
+
+					if(space==2 && ERROARG!=1 && atoi(rdcom)>0 && atoi(ndcom)>0){
+						sprintf(comunicacao.mensagem, "%s %s %s", ndcom, rdcom, argv[1]);
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+							printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("\n%s", comunicacao.resposta);
+							}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+					}else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+					
+					
+				}
+
+				else if(strcmp(stcom, "sell")==0){
+
+					comunicacao.codMsg=1;
+
+					int space=0;
+					int ERROARG=0;
+					int b=0;
+					int a=0;
+					for(int i=0; com[i] != '\n'; i++, a++){
+									if(com[i]==' '){
+										if(com[i-1]==' '){
+											ERROARG=1;
+											break;
+										}
+										space++;
+										b=a;
+										a=-1;	
+									}
+									else{
+										if(space==1)
+											ndcom[a]=com[i];
+										if(space==2){
+											ndcom[b]='\0';
+											rdcom[a]=com[i];	
+										}
+										if(space==3){
+											rdcom[b]='\0';
+											prbase[a]=com[i];
+										}
+										if(space==4){
+											prcj[b]='\0';
+											prcj[a]=com[i];
+										}
+										if(space==5){
+											dur[b]='\0';
+											dur[a]=com[i];
+										}
+									}
+								}dur[a]='\0';
+								
+
+					if(space==5 && ERROARG!=1){
+						sprintf(comunicacao.mensagem, "%s %s %s %s %s %s", ndcom, rdcom, prbase, prcj, dur, argv[1]);
+						//printf("\nVender o item %s da categoria %s, com um preco base de %s, disponivel ja por %s durante %s segundos\n", comunicacao.mensagem, comunicacao.arg2, comunicacao.arg3, comunicacao.arg4, comunicacao.arg5);
+
+						//mandar a struct ao backend
+						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+							printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+						else
+							printf("[ERRO] - Ao comunicar com o backend\n");
+
+						//receber resposta do backend
+						fdr= open(fifo, O_RDONLY);
+						if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("\n%s", comunicacao.resposta);
+							}
+						else
+							printf("[ERRO] - Ao receber do backend\n");
+					}else
+						printf("[ERRO] - ARGUMETOS INVALIDOS\n");
+
+				}
+
+				else
+					printf("\nComando inválido!\n");
+
+			}
+
+			else if(spaceflag==0){
+			if(strcmp(com,"list\n")==0){
+				comunicacao.codMsg=2;
 
 				//mandar a struct ao backend
-				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-				printf("Enviei...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
-				}
+					if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+						printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					else
+						printf("[ERRO] - Ao comunicar com o backend\n");
+
+					//receber resposta do backend
+					fdr= open(fifo, O_RDONLY);
+					if((n = read(fdr, &temp, sizeof(temp)))>0){
+						close(fdr);
+
+						printf("\nLista os itens:");
+						int g=0;
+						for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+									if(temp[g].valLic!=0)
+										printf(", ult.Lic.: %s, valor Lic.: %d€.", temp[g].nomeLic, temp[g].valLic);
+									else
+										printf(", ainda sem licitacoes.");
+								}
+						if(g==0)
+							printf("Não existem produtos em leilao de momento\n");
+					}
+						
+					else
+						printf("[ERRO] - Ao receber do backend\n");
+
+				
+			}
+
+			else if(strcmp(com,"time\n")==0){
+
+				comunicacao.codMsg=7;
+
+				//mandar a struct ao backend
+				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 				else
 					printf("[ERRO] - Ao comunicar com o backend\n");
 
@@ -121,184 +578,55 @@ int main(int argc, char*argv[]){
 				if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
 					close(fdr);
 
-					printf("\nListar os itens do utilizador %s\n", ndcom);
-					printf("%s\n",  comunicacao.arg1);
-					printf("%s",  comunicacao.arg2);
+					printf("\nHora atual: ");
+					printf("%s", comunicacao.resposta);
 				}
 				else
 					printf("[ERRO] - Ao receber do backend\n");
-
-
 			}
 
-			else if(strcmp(stcom, "licat")==0){
-				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
-					ndcom[k] = com[j];
-				}
-				printf("\nListar os itens da categoria %s\n", ndcom);
-			}
+			else if(strcmp(com,"cash\n")==0){
 
-			else if(strcmp(stcom, "lival")==0){
-				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
-					ndcom[k] = com[j];
-				}
-				int valmax = atoi(ndcom);
-				printf("\nListar os itens da que custam até %d\n", valmax);
-			}
-
-			else if(strcmp(stcom, "litime")==0){
-				for(k=0,j=i+1; com[j]!='\0'; j++, k++){
-					ndcom[k] = com[j];
-				}
-				int valtime = atoi(ndcom);
-				printf("\nListar os itens com pazo até %d segundos\n", valtime);
-			}
-
-			else if(strcmp(stcom, "add")==0){
-				for(k=0,j=i+1; com[j]!='\n'; j++, k++){
-					ndcom[k] = com[j];
-				}
-				ndcom[k+1] = '\0';
-				int valof = atoi(ndcom);
-
-				if(valof>0){
-					comunicacao.codMsg=10;
-					strcpy(comunicacao.arg1,ndcom);
-
-					//mandar a struct ao backend
-					if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-					printf("Enviei...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
-					}
-					else
-						printf("[ERRO] - Ao comunicar com o backend\n");
-
-					//receber resposta do backend
-					fdr= open(fifo, O_RDONLY);
-					if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
-						close(fdr);
-						printf("%s\n",  comunicacao.resposta);
-					}
-					else
-						printf("[ERRO] - Ao receber do backend\n");
-
-
-
-				}
-					
+				comunicacao.codMsg=9;
+				strcpy(comunicacao.mensagem, argv[1]);
+				//mandar a struct ao backend
+				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
+					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 				else
-					printf("\nIndique um valor válido");
+					printf("[ERRO] - Ao comunicar com o backend\n");
 
+				//receber resposta do backend
+				fdr= open(fifo, O_RDONLY);
+				if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
+					close(fdr);
+					
+					printf("%s", comunicacao.resposta);
+				}
+				else
+					printf("[ERRO] - Ao receber do backend\n");
 			}
 
-			else if(strcmp(stcom, "buy")==0){
-				for(k=0,j=i+1; com[j]!=' '; j++, k++){
-					ndcom[k] = com[j];
-				}
-				int id = atoi(ndcom);
-				for(k=0,j+=1; com[j]!='\0'; j++, k++){
-					rdcom[k] = com[j];
-				}
-				
-				
-			}
+			else if(strcmp(com,"exit\n")==0){
 
-			else if(strcmp(stcom, "sell")==0){
-				for(k=0,j=i+1; com[j]!=' '; j++, k++){
-					ndcom[k] = com[j];
-				}
+				comunicacao.codMsg=11;
 
-				for(k=0,j+=1; com[j]!=' '; j++, k++){
-					rdcom[k] = com[j];
+				//mandar a struct ao backend
+				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					unlink (fifo);
+					exit(-1);
 				}
-
-				for(k=0,j+=1; com[j]!=' '; j++, k++){
-					prbase[k] = com[j];
-				}
-
-				int prb = atoi(prbase);
-				for(k=0,j+=1; com[j]!=' '; j++, k++){
-					prcj[k] = com[j];
-				}
-
-				int prc = atoi(prcj);
-				for(k=0,j+=1; com[j]!='\0'; j++, k++){
-					dur[k] = com[j];
-				}
-
-				int dtemp = atoi(dur);
-				printf("\nVender o item %s da categoria %s, com um preco base de %d, disponivel ja por %d durante %d segundos\n", ndcom, rdcom, prb, prc, dtemp);
+				else
+					printf("[ERRO] - Ao comunicar com o backend\n");
 			}
 
 			else
 				printf("\nComando inválido!\n");
-
-		}
-
-		else if(spaceflag==0){
-		if(strcmp(com,"list\n")==0){
-			printf("\nLista os itens\n");
-		}
-
-		else if(strcmp(com,"time\n")==0){
-
-			comunicacao.codMsg=7;
-
-			//mandar a struct ao backend
-			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
-				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
-			else
-				printf("[ERRO] - Ao comunicar com o backend\n");
-
-			//receber resposta do backend
-			fdr= open(fifo, O_RDONLY);
-			if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
-				close(fdr);
-
-				printf("\nHora atual: ");
-				printf("%s", comunicacao.resposta);
 			}
-			else
-				printf("[ERRO] - Ao receber do backend\n");
-		}
-
-		else if(strcmp(com,"cash\n")==0){
-
-			comunicacao.codMsg=9;
-
-			//mandar a struct ao backend
-			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0)
-				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
-			else
-				printf("[ERRO] - Ao comunicar com o backend\n");
-
-			//receber resposta do backend
-			fdr= open(fifo, O_RDONLY);
-			if((n = read(fdr, &comunicacao, sizeof(msgBF)))>0){
-				close(fdr);
-				printf("\nSaldo atual: ");
-				printf("%s €", comunicacao.arg1);
-			}
-			else
-				printf("[ERRO] - Ao receber do backend\n");
-		}
-
-		else if(strcmp(com,"exit\n")==0){
-
-			comunicacao.codMsg=11;
-
-			//mandar a struct ao backend
-			if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-				printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
-				unlink (fifo);
-				exit(-1);
-			}
-			else
-				printf("[ERRO] - Ao comunicar com o backend\n");
-		}
-
-		else
-			printf("\nComando inválido!\n");
-		}
+		/*}
+		else if(sel>0 && FD_ISSET(fdr, &fds) && (n= read(fdr, &comunicacao, sizeof(msgBF)))>0 && comunicacao.codMsg==12){
+			printf("\n%s",  comunicacao.resposta);
+		}*/
 
 	}while(1);
 

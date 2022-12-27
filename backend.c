@@ -1,6 +1,29 @@
 //===================== BACKEND =====================//
 #include "header.h"
 
+
+int flagNMaxI=0;
+char fifo[40];
+
+void enviaMensagemU(void *a, msgBF b, char resposta[]){
+
+	int fdr, n;
+	Cliente *clientesOnline = (Cliente*) a;
+	strcpy(b.resposta, resposta);
+	b.codMsg=12;
+	for(int i=0; i<NMAXUSERS && strcmp(clientesOnline[i].nome, "a")!=0; i++){
+		sprintf(fifo, FRONTENDFIFO, clientesOnline[i].pid);
+		fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+			if((n= write(fdr, &b, sizeof(msgBF)))>0){
+				close(fdr);
+				printf("Enviei... (%d bytes)\n", n);
+			}
+			else
+				printf("[ERRO] - ao enviar dados a utilizador");
+	}
+
+}
+
 int verificaUtilizadores(int contadorClientes){
 
 	
@@ -22,10 +45,11 @@ int verificaItems (int contadorItems){
 void *imprimePromotor(void *a){
 	killThread *ta = (killThread*) a;
 	/*-----------------PROMOTOR-------------------*/
+
 				int p_b[2];
 				int size, pid;
 				int estado;	
-
+				int isto=0;
 				pipe(p_b);
 				char  res[100];
 
@@ -37,7 +61,7 @@ void *imprimePromotor(void *a){
 					close(1);
 					dup(p_b[1]);
 
-					execlp("./promotor_oficial", "promotor_oficial", NULL);
+					isto = execl(ta->nomePromotor, ta->nomePromotor, NULL);
 					exit(-1);
 						
 				}
@@ -47,51 +71,11 @@ void *imprimePromotor(void *a){
 				
 				while((size = read(p_b[0], res, 99))>0 && ta->kill!=1){
 					res[size] = '\0';
-					if(strcmp(res,"\n")!=0)
+					if(strcmp(res,"\n")!=0){
 						printf("\nPromotor: %s", res);
 
-				}
-				close(p_b[0]);
-				
 
-				wait(&estado);
-
-			
-	
-    pthread_exit(NULL);
-}
-
-void *imprimePromotorBF(void *a){
-	killThread *ta = (killThread*) a;
-	/*-----------------PROMOTOR-------------------*/
-				int p_b[2];
-				int size, pid;
-				int estado;	
-
-				pipe(p_b);
-				char  res[100];
-
-				int f = fork();
-				if(f == 0){
-					//filho corre o promotor
-					pid=getpid();
-					close(p_b[0]);
-					close(1);
-					dup(p_b[1]);
-
-					execlp("./black_friday", "black_friday", NULL);
-					exit(-1);
-						
-				}
-					
-				//pai continua a correr
-				close(p_b[1]);
-				
-				while((size = read(p_b[0], res, 99))>0 && ta->kill!=2){
-					res[size] = '\0';
-					if(strcmp(res,"\n")!=0)
-						printf("\nPromotor BF: %s", res);
-
+					}
 
 				}
 				close(p_b[0]);
@@ -103,6 +87,30 @@ void *imprimePromotorBF(void *a){
 	
     pthread_exit(NULL);
 }
+
+void *decreaseTime(void *leilao){
+    int y=0;
+   	Leilao *tleilao = (Leilao*) leilao;
+    do{
+        for (int i = 0; i<NMAXITEMS && strcmp(tleilao[i].nome, "a")!=0; i++) {
+             if(tleilao[i].duracao<=1){
+                for (y = i; y<NMAXITEMS && strcmp(tleilao[y].nome, "a")!=0; y++) {
+					if(y<NMAXITEMS-1)
+                    	tleilao[y] = tleilao[y+1];
+					if(y==NMAXITEMS-1){
+						strcpy(tleilao[y].nome,"a");
+						break;
+					}
+                }
+				flagNMaxI=0;
+            }
+            tleilao[i].duracao--; 
+        }
+        sleep(1);
+    }while(1);
+
+}
+
 
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (BACKENDFIFO);
@@ -113,126 +121,122 @@ void handler_sigalarm(int s,siginfo_t *t, void *v){
 }
 
 
-int main(){
+int main(char *envp[]){
 
 	struct sigaction sa;
     sa.sa_sigaction=handler_sigalarm;
     sigaction(SIGINT, &sa, NULL);
 
-	/*------------thread promotor---------------*/
+	/*-----------variaveis de ambiente------------*/
+
+	char *fpromotor="promotor_oficial";
+	char *fusers="FUSERS.txt";
+	char *fitems="FITEMS.txt";
+
+	if(getenv("FPROMOTORES")){
+  		fpromotor = getenv("FPROMOTORES");
+	}
+	if(getenv("FUSERS")){
+  		fusers = getenv("FUSERS");
+	}
+	if(getenv("FITEMS")){
+  		fitems = getenv("FITEMS");
+	}
+	/*--------------------------------------------*/
+
+	/*------------thread promotores---------------*/
 	killThread a;
 	pthread_t promotor;
-	pthread_t promotorBF;
 	a.kill=0;
+	strcpy(a.nomePromotor,fpromotor);
+
 	if(pthread_create(&promotor,NULL,&imprimePromotor, &a)!=0)
-		printf("promotor nao da!");
-	if(pthread_create(&promotorBF,NULL,&imprimePromotorBF, &a)!=0)
-		printf("promotor BF nao da!");
+		printf("promotor nao irá funcionar!");
+	else
+		printf("promotor '%s' iniciado", fpromotor);
 
-	/*------------------------------------------*/
 
+	/*--------------------------------------------*/
 	int op;
 
-	int i=0, count=0;
-	char c;
-	char palavra[20];
+	int space=0;
+	char mensagemG[100];
+	char filePName[30];
+	sprintf(filePName,"./%s",fusers);
+
 	int contadorClientes=0, contadorItens=0;
-	contadorClientes = loadUsersFile("./FUSERS.txt");
-	//Cliente clientes[contadorClientes];
+	contadorClientes = loadUsersFile(filePName);
+	
 
 	msgBF comunicacao;
 	Cliente clientesOnline[NMAXUSERS];
-	int flagNMax=0;
+	int flagNMaxU=0;
 	strcpy(clientesOnline[0].nome, "a");
-
-	/* GUARDAR DADOS DO FICHEIRO DE UTILIZADORES NA ESTRUTURA
-	if (verificaUtilizadores(contadorClientes)==1){
-
-		i=0;
-		count=3;
-		FILE *f = fopen("FUSERS.txt", "r");
-
-				
-		while((c = fgetc(f))!= EOF){
-			ungetc (c,f);
-			if(f){
-				while(fscanf(f, "%19s", palavra)==1){
-					if(i>=contadorClientes)
-						break;
-					if(count==3)
-						strcpy(clientes[i].nome, palavra);
-					else if(count==2)
-						strcpy(clientes[i].pw, palavra);
-					else if(count==1){
-						clientes[i].saldo=atoi(palavra);
-						i++;
-					}
-					if (count!=1)
-						count--;
-					else
-						count=3;			
-				}
-					
-			}
-		}
-		fclose(f);
-	}
-	*/
-	/*----------------------------------------------------------------------------*/
 	
-	/* GUARDAR DADOS DO FICHEIRO DE ITENS NA ESTRUTURA*/
-	i=0;
-	count=5;
-	c=0;
+	/*------------GUARDAR DADOS DO FICHEIRO DE ITENS NA ESTRUTURA-----------------*/
+	
+	int i=0, count=9;
+	char c;
 	int ch=0;
-	FILE *f2 = fopen("FITEMS.txt", "r");
-	while(!feof(f2)){
-  		ch = fgetc(f2);
-  		if(ch == '\n')
-		contadorItens++;
-	}
-	fclose(f2);
-	if (contadorItens>0)
-		contadorItens+=1;
+	char palavra[20];
 
-	Item itens[contadorItens];
-	if(verificaItems(contadorItens)==1){
-		FILE *f3 = fopen("FITEMS.txt", "r");
+	Leilao items[NMAXITEMS];
+	Leilao temp[NMAXITEMS]; //para envios expecificos
+	FILE *f = fopen(fitems, "r");
 
-		while((c = fgetc(f3))!= EOF){
-			ungetc (c,f3);
-			if(f2){
-				while(fscanf(f3, "%19s", palavra)==1){
-					if(i>=contadorItens)
-						break;
-					if(count==5)
-						itens[i].ID=atoi(palavra);
-					else if(count==4)
-						strcpy(itens[i].nome, palavra);
-					else if(count==3)
-						strcpy(itens[i].categoria, palavra);
-					else if(count==2)
-						itens[i].valbase=atoi(palavra);
-					else if(count==1)
-						itens[i].valcp=atoi(palavra);
-					if (count!=1)
-						count--;
-					else{
-						count=5;
-						i++;
-					}		
-				}				
-			}
-		}
-		fclose(f3);
+	while((c = fgetc(f))!= EOF){
+		ungetc (c,f);
+			
+		while(fscanf(f, "%19s", palavra)==1){
+			
+			if(count==9)
+				items[i].ID=atoi(palavra);
+			else if(count==8)
+				strcpy(items[i].nome, palavra);
+			else if(count==7)
+				strcpy(items[i].categoria, palavra);
+			else if(count==6)
+				items[i].valbase=atoi(palavra);
+			else if(count==5)
+				items[i].valcp=atoi(palavra);
+			else if(count==4)
+				items[i].duracao=atoi(palavra);
+			else if(count==3)
+				strcpy(items[i].nomeVend,palavra);
+			else if(count==2)
+				strcpy(items[i].nomeLic,palavra);
+			else if(count==1)
+				items[i].valLic=atoi(palavra);
+			if (count!=1)
+				count--;
+			else{
+				count=9;
+				i++;
+				contadorItens++;
+			}		
+				
+			
+		}		
 	}
+	fclose(f);
+
+	if(contadorItens==NMAXITEMS)
+		flagNMaxI=1;
+	
+	int id=contadorItens+1;
+	strcpy(items[contadorItens].nome, "a");
+	pthread_t tempo;
+
+	if(pthread_create(&tempo,NULL,&decreaseTime, &items)!=0)
+		printf("[ERRO] - IMPOSSIVEL DECRESCER O TEMPO!");
+	
 	/*----------------------------------------------------------------------------*/
 
-	/*VALIDACAO DE SESSÕES DO FRONTEND*/
+	/*-----------------------------Interação com o cliente------------------------*/
 
 	int fd, n, fdr;
 	int sel, sel1;
-	char fifo[40];
+	
 	fd_set fds;
 
 	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
@@ -242,6 +246,8 @@ int main(){
 	
 	fd = open(BACKENDFIFO, O_RDWR);  //bloqueia - se não houver clientes
     	printf("Abri o fifo '%s'\n", BACKENDFIFO); //acrescentar ao nome do fifo, o pid para saber a que utilizador enviar a resposta
+
+	/*----------------------------------------------------------------------------*/
 	do{
 
 
@@ -284,29 +290,8 @@ int main(){
 					stcom[i] = '\0';
 
 					if(strcmp(stcom, "kick")==0){
-						for(k=0,j=i+1; com[j]!='\n'; j++, k++){
-							ndcom[k] = com[j];
-						}
-						ndcom[k+1]='\0';
-
-						int g;
-						for(g=0; g<NMAXUSERS;g++){
-
-							if(strcmp(clientesOnline[g].nome, "a")==0)
-								break; 
-							else if(strcmp(ndcom, clientesOnline[g].nome)==0){
-
-								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, clientesOnline[g].saldo);
-								break;
-							}
-								
-						}
-						if(g==0)
-							printf("Sem utilizadores online!\n");
-							
-
-						printf("\nBanir o utilizador %s\n", ndcom);
-					}
+						
+               		}
 
 					else if(strcmp(stcom, "cancel")==0){
 
@@ -314,23 +299,14 @@ int main(){
 							ndcom[k] = com[j];
 						}
 						ndcom[k+1]='\0';
-						//printf("!%d!", strcmp(ndcom, "promotor"));
-						if(strcmp(ndcom, "promotor")==0){
-
-							printf("\nCancelei o promotor '%s'", ndcom);
+					
+						if(strcmp(ndcom, fpromotor)==0){
 							a.kill=1;
-
-						}else if(strcmp(ndcom, "promotorBF")==0){
-
-							printf("\nCancelei o promotor '%s'", ndcom);
-							a.kill=2;
-						}else{
-							printf("\nPromotor '%s' não existe!", ndcom);
+							printf("\nFicheiro de pormotores cancelado!\n");
 						}
-						
-					}
-					else 
+						else 
 						printf("\nComando invalido!\n");
+					}
 				}
 
 				else{
@@ -348,12 +324,9 @@ int main(){
 						else{
 							//int res=0;
 							int g;
-							for(g=0; g<NMAXUSERS;g++){
+							for(g=0; g<NMAXUSERS && strcmp(clientesOnline[g].nome, "a")!=0;g++){
 
-								if(strcmp(clientesOnline[g].nome, "a")==0)
-								break; 
-								else
-								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, clientesOnline[g].saldo);
+								printf("Utilizador: %s, Pass: %s, Saldo: %d\n", clientesOnline[g].nome, clientesOnline[g].pw, getUserBalance(clientesOnline[g].nome));
 								
 							}
 							if(g==0)
@@ -367,9 +340,13 @@ int main(){
 
 						printf("\nLista os itens a venda\n");
 						if(verificaItems(contadorItens)==1){
-							for(int g=0; g<contadorItens;g++)
-								printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d, VC: %d", itens[g].ID, itens[g].nome, itens[g].categoria, itens[g].valbase, itens[g].valcp);
-
+							for(int g=0; strcmp(items[g].nome, "a")!=0 && g<NMAXITEMS;g++){
+								printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", items[g].ID, items[g].nome, items[g].categoria, items[g].valbase, items[g].valcp, items[g].duracao, items[g].nomeVend);
+								if(items[g].valLic!=0)
+									printf(", ult.Lic.: %s, valor Lic.: %d€.", items[g].nomeLic, items[g].valLic);
+								else
+									printf(", ainda sem licitacoes.");
+							}
 						printf("\n");
 						}
 						else
@@ -384,14 +361,12 @@ int main(){
 					}
 					else if(strcmp(com,"close\n")==0){
 						printf("\nA plataforma vai encerrar\n");
-						for(int m=0; m<2; m++){
-							if(m==0)
-							a.kill=1;
-							if(m==1)	
-							a.kill=2;
-						}
+						close(fd);
 						unlink(BACKENDFIFO);
-						exit(-1);
+							
+						a.kill=1;	
+						pthread_join(promotor, NULL);
+						//exit(-1);
 					}
 					else
 						printf("\nComando invalido!\n");
@@ -407,22 +382,43 @@ int main(){
 
 			
 				if((n= read(fd, &comunicacao, sizeof(msgBF)))>0){ // HA DADOS.... NAO BLOQUEIA
-					printf("Recebi...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.pid, n);
+					printf("Recebi...%d %s %d (%d bytes)\n", comunicacao.codMsg, comunicacao.mensagem, comunicacao.pid, n);
 
 					if(comunicacao.codMsg==0){//iniciar sessão
+
+						char arg1[20];
+						char arg2[20];
+						space=0;
+						int a=0;
+						int b=0;
+						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+							if(comunicacao.mensagem[i]==' '){
+								space+=1;
+								b=a;
+								a=-1;
+							}
+							else{
+								if(space==0)
+									arg1[a]=comunicacao.mensagem[i];
+								if(space==1){
+									arg1[b]='\0';
+									arg2[a]=comunicacao.mensagem[i];
+								}
+							}		
+						}arg2[a]='\0';
 
 						int estaOnline=0;
 
 						for(int i=0; i<NMAXUSERS; i++){
-							if(strcmp(clientesOnline[i].nome,comunicacao.arg1)==0 && strcmp(clientesOnline[i].pw,comunicacao.arg2)==0){
+							if(strcmp(clientesOnline[i].nome,arg1)==0 && strcmp(clientesOnline[i].pw,arg2)==0){
 								estaOnline=1;
 								break;
 							}
 						}
-						if(estaOnline==0 && flagNMax==0){
+						if(estaOnline==0 && flagNMaxU==0){
 						//verifica na estrutura se existe
 						
-							if(isUserValid(comunicacao.arg1, comunicacao.arg2)==1){
+							if(isUserValid(arg1,arg2)==1){
 									strcpy(comunicacao.arg3, "1");
 									printf("%s",comunicacao.arg3);
 
@@ -430,15 +426,14 @@ int main(){
 									for(int i=0;i<NMAXUSERS;i++){
 										if(strcmp(clientesOnline[i].nome, "a")==0){
 
-											strcpy(clientesOnline[i].nome, comunicacao.arg1);
-											strcpy(clientesOnline[i].pw, comunicacao.arg2);
-											clientesOnline[i].saldo=getUserBalance(comunicacao.arg1);
+											strcpy(clientesOnline[i].nome,arg1);
+											strcpy(clientesOnline[i].pw,arg2);
 											clientesOnline[i].pid=comunicacao.pid;
 											if(i<NMAXUSERS-1){
 												strcpy(clientesOnline[i+1].nome, "a");
 											}
 											else if (i==NMAXUSERS-1)
-												flagNMax=1;
+												flagNMaxU=1;
 											break;
 										}
 									}
@@ -451,21 +446,21 @@ int main(){
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
 							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
 								close(fdr);
-								printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
+								printf("Enviei...%d %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, comunicacao.arg3, n);
 							}
 							else
 								printf("[ERRO] - ao enviar dados a utilizador");
 						}else{
 							if(estaOnline==1)
 								sprintf(comunicacao.resposta, "Utilizador já se encntra online!");
-							else if(flagNMax==1)
+							else if(flagNMaxU==1)
 								sprintf(comunicacao.resposta, "O número máximo de utilizadores foi atingido!");
 							//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
 							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
 								close(fdr);
-								printf("Enviei...%d %s %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.arg1, comunicacao.arg2, comunicacao.pid, comunicacao.arg3, n);
+								printf("Enviei...%d %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, comunicacao.arg3, n);
 							}
 							else
 								printf("[ERRO] - ao enviar dados a utilizador");
@@ -474,25 +469,82 @@ int main(){
 					}
 
 					else if(comunicacao.codMsg==1){
+						
 
+						if(flagNMaxI!=1){
+
+							char arg1[20];
+							char arg2[20];
+							char arg3[20];
+							char arg4[20];
+							char arg5[20];
+							char arg6[20];
+							space=0;
+							for(int i=0, a=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+								if(comunicacao.mensagem[i]==' '){
+									space++;
+									a=-1;
+								}
+								else{
+									if(space==0)
+										arg1[a]=comunicacao.mensagem[i];
+									if(space==1)
+										arg2[a]=comunicacao.mensagem[i];
+									if(space==2)
+										arg3[a]=comunicacao.mensagem[i];
+									if(space==3)
+										arg4[a]=comunicacao.mensagem[i];
+									if(space==4)
+										arg5[a]=comunicacao.mensagem[i];
+									if(space==5)
+										arg6[a]=comunicacao.mensagem[i];
+								}
+							}
+							
+							if(atoi(arg3)>0 && atoi(arg4)>0 && atoi(arg5)>0){
+
+								for(int i=0; i<NMAXITEMS; i++){
+									if(strcmp(items[i].nome, "a")==0){
+										items[i].ID=id++;
+										strcpy(items[i].nome,arg1);
+										strcpy(items[i].categoria,arg2);
+										items[i].valbase=atoi(arg3);
+										items[i].valcp=atoi(arg4);
+										items[i].duracao=atoi(arg5);
+										strcpy(items[i].nomeVend, arg6);
+										strcpy(items[i].nomeLic, "-");
+										items[i].valLic= atoi("-");
+										if(i<NMAXITEMS-1)
+											strcpy(items[i+1].nome,"a");
+										else if(i==NMAXITEMS-1){
+											flagNMaxI=1;
+										}
+										break;
+									}
+								}
+							strcpy(comunicacao.resposta, "ITEM ADICIONADO AO LEILÃO!");
+
+							}else
+								strcpy(comunicacao.resposta, "[ERRO] - DADOS INVÁLIDOS!");
+						}else
+							strcpy(comunicacao.resposta, "[ERRO] - NÚMERO MÁXIMO DE ITENS À VENDA!");
+
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+							close(fdr);
+							printf("Enviei...%d, %s (%d bytes)\n", comunicacao.pid, comunicacao.resposta, n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+						
 					}
 					else if(comunicacao.codMsg==2){
-
-					}
-					else if(comunicacao.codMsg==3){
-						
-
-						
-					}
-					else if(comunicacao.codMsg==4){
-
-						strcpy(comunicacao.arg1, clientesOnline[0].nome);
-						strcpy(comunicacao.arg2, clientesOnline[1].nome);
 
 						//enviar resposta
 						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
-						if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
+						if((n= write(fdr, &items, sizeof(items)))>0){
 							close(fdr);
 							printf("Enviei... (%d bytes)\n", n);
 						}
@@ -500,10 +552,101 @@ int main(){
 							printf("[ERRO] - ao enviar dados a utilizador");
 
 					}
+					else if(comunicacao.codMsg==3){
+
+						int y=0;
+						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+							if(strcmp(items[i].categoria, comunicacao.mensagem)==0){
+								temp[y]=items[i];
+								y++;
+							}
+						}
+
+						strcpy(temp[y].nome, "a");
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+							printf("Enviei... (%d bytes)\n", n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+						
+						strcpy(temp[0].nome, "a");
+						
+					}
+					else if(comunicacao.codMsg==4){
+						
+						int y=0;
+						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+							if(strcmp(items[i].nomeVend, comunicacao.mensagem)==0){
+								temp[y]=items[i];
+								printf("!%s!", temp[y].nome);
+								y++;
+							}
+						}
+						strcpy(temp[y].nome, "a");
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+							printf("Enviei... (%d bytes)\n", n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+						
+						strcpy(temp[0].nome, "a");
+
+
+					}
 					else if(comunicacao.codMsg==5){
+
+						int y=0;
+						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+							if(items[i].valbase < atoi(comunicacao.mensagem)){
+								temp[y]=items[i];
+								y++;
+							}
+						}
+
+						strcpy(temp[y].nome, "a");
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+							printf("Enviei... (%d bytes)\n", n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+						
+						strcpy(temp[0].nome, "a");
 
 					}
 					else if(comunicacao.codMsg==6){
+
+						int y=0;
+						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+							if(items[i].duracao < atoi(comunicacao.mensagem)){
+								temp[y]=items[i];
+								y++;
+							}
+						}
+
+						strcpy(temp[y].nome, "a");
+						//enviar resposta
+						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
+						fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
+						if((n= write(fdr, &temp, sizeof(temp)))>0){
+							close(fdr);
+							printf("Enviei... (%d bytes)\n", n);
+						}
+						else
+							printf("[ERRO] - ao enviar dados a utilizador");
+						
+						strcpy(temp[0].nome, "a");
 
 						
 
@@ -512,11 +655,8 @@ int main(){
 
 						time_t t = time(NULL);
 						struct tm tm = *localtime(&t);
-						char teste[50];
 						
 						sprintf(comunicacao.resposta, "%d-%d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);	//data
-						//strcat(comunicacao.arg1, teste);	//hora
-
 
 						//enviar resposta
 						sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
@@ -530,76 +670,114 @@ int main(){
 					}
 					else if(comunicacao.codMsg==8){
 
+						char arg1[20];
+						char arg2[20];
+						char arg3[20];
+						int b=0;
+						int a=0;
+						space=0;
+						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, a++){
+							if(comunicacao.mensagem[i]==' '){
+								space++;
+								b=a;
+								a=-1;
+							}
+							else{
+								if(space==0){
+									arg1[a]=comunicacao.mensagem[i];
+								}
+								if(space==1){
+									arg1[b]='\0';
+									arg2[a]=comunicacao.mensagem[i];
+								}
+								if(space==2){
+									arg2[b]='\0';
+									arg3[a]=comunicacao.mensagem[i];
+								}
+							}
+						}arg3[a]='\0';
+						
+						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+							if(items[i].ID == atoi(arg1)){
+								
+								if(items[i].valcp==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
+									updateUserBalance(arg3, getUserBalance(arg3)-items[i].valcp);
+									updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+items[i].valcp);
+									for (int y = i; y<NMAXITEMS && strcmp(items[y].nome, "a")!=0; y++) { //apagar o item da estrutura
+										if(y<NMAXITEMS-1)
+                    						items[y] = items[y+1];
+										if(y==NMAXITEMS-1){
+											strcpy(items[y].nome,"a");
+											flagNMaxI=0;
+											break;
+										}
+                					}
+
+									strcpy(comunicacao.resposta, "Comprado pelo VC com sucesso!");
+									sprintf(mensagemG, "O produto com ID=%d foi comprado pelo utilizador '%s' por %d€", items[i].valcp, arg3, atoi(arg2));
+									enviaMensagemU(&clientesOnline, comunicacao, mensagemG);
+									break;
+								}
+								else if(items[i].valbase<atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //licitacao do produto
+									strcpy(items[i].nomeLic,arg3);
+									items[i].valLic=atoi(arg2);
+
+									strcpy(comunicacao.resposta, "Produto Licitado com sucesso!");
+									break;
+								}else
+									strcpy(comunicacao.resposta, "Nao tem fundos necessários!");
+
+							}else
+								strcpy(comunicacao.resposta, "O produto mencionado nao existe!");
+						}
+						saveUsersFile(fusers);
+
 					}
 					else if(comunicacao.codMsg==9){
 
-						int y, saldo;
-						for(y=0; y<NMAXUSERS; y++){
-							if(clientesOnline[y].pid==comunicacao.pid)
-								break;
-							
-						}
-						saldo=getUserBalance(clientesOnline[y].nome);
 
-						if(saldo!=-1){
-							sprintf(comunicacao.arg1,"%d", saldo);
-							printf("%s", comunicacao.arg2);
-							//enviar resposta
+						if(getUserBalance(comunicacao.mensagem)!=-1)
+							sprintf(comunicacao.resposta, "O seu saldo é %d€", getUserBalance(comunicacao.mensagem));
+						else
+							strcpy(comunicacao.resposta, "[ERRO] - AO PROCURAR PELO UTILIZADOR");
+							
+						
+						//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
 							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
 								close(fdr);
-								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
+								printf("Enviei..%d (%d bytes)\n", comunicacao.pid, n);
 							}else
 								printf("[ERRO] - ao enviar dados a utilizador");
-						}
-						else{
-							strcpy(comunicacao.arg1, "[ERRO] - Ao procurar o saldo");
-							//enviar resposta
-							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
-							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
-							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
-								close(fdr);
-								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
-							}else
-								printf("[ERRO] - ao enviar dados a utilizador");
-						}
 
 					}
 					else if(comunicacao.codMsg==10){
 
-							int saldo=0;
-							int g, verUpdate=0;
-							saldo=atoi(comunicacao.arg1);
-							if(saldo>0){
-								
-								for(g=0;g<NMAXUSERS;g++){
-
-									if(clientesOnline[g].pid==comunicacao.pid){
-										
-										updateUserBalance(clientesOnline[g].nome, getUserBalance(clientesOnline[g].nome)+saldo);
-										clientesOnline[g].saldo=getUserBalance(clientesOnline[g].nome);
-										verUpdate=1;
-										break;
-
-									}
-
-
+							
+							int verUpdate=0;
+							
+							for(int g=0;g<NMAXUSERS && strcmp(clientesOnline[g].nome, "a")!=0;g++){
+								if(clientesOnline[g].pid==comunicacao.pid){		
+									updateUserBalance(clientesOnline[g].nome, getUserBalance(clientesOnline[g].nome)+atoi(comunicacao.mensagem));
+									verUpdate=1;
+									
+									break;
 								}
-								saveUsersFile("FUSERS.txt");
-								if(verUpdate==1){
-									sprintf(comunicacao.resposta, "Atualizado com sucesso!");
-								}else
-									sprintf(comunicacao.resposta, "[ERRO] - Ao atualizar!");
+							}
+							saveUsersFile(fusers);
 
+							if(verUpdate==1){
+								sprintf(comunicacao.resposta, "Saldo atualizado com sucesso!");
 							}else
-								sprintf(comunicacao.resposta, "[ERRO] - Valor não permitido!");
+								sprintf(comunicacao.resposta, "[ERRO] - Ao atualizar!");
+
 							//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
 							if((n= write(fdr, &comunicacao, sizeof(msgBF)))>0){
 								close(fdr);
-								printf("Enviei a quantidade de dinheiro %d(%d bytes)\n", comunicacao.pid, n);
+								printf("Enviei.. %d(%d bytes)\n", comunicacao.pid, n);
 							}else
 								printf("[ERRO] - ao enviar dados a utilizador");
 
@@ -607,31 +785,27 @@ int main(){
 					}
 					else if(comunicacao.codMsg==11){
 
-						int y, j;
-						for(y=0; y<NMAXUSERS; y++){
-							if(clientesOnline[y].pid==comunicacao.pid)
-								break;
-							
+						int y, j, valido=0;
+						for(y=0; y<NMAXUSERS && strcmp(clientesOnline[y].nome, "a")!=0; y++){
+							if(clientesOnline[y].pid==comunicacao.pid){
+								valido=1;
+								break;		
+							}
 						}
-						if(y>=0){
-							for (j=y;j<NMAXUSERS; j++){  
-								if(strcmp(clientesOnline[i+1].nome, "a")==0)
+						if(valido==1){
+							for (j = y; j<NMAXUSERS && strcmp(clientesOnline[j].nome, "a")!=0; j++) {
+								if(j<NMAXUSERS-1)
+									clientesOnline[j] = clientesOnline[j+1];
+								if(j==NMAXUSERS-1){
+									strcpy(clientesOnline[j].nome,"a");
 									break;
-								if(j+1<NMAXUSERS){
-									strcpy(clientesOnline[j].nome, clientesOnline[j+1].nome);
-									strcpy(clientesOnline[j].pw, clientesOnline[j+1].pw);
-									clientesOnline[j].saldo=clientesOnline[j+1].saldo;
-									clientesOnline[j].pid=clientesOnline[j+1].pid;
 								}
-								else if(j==NMAXUSERS-1  && flagNMax==1){
-									strcpy(clientesOnline[j].nome, "a");
-									flagNMax=0;
-								}
-							} 
+								
+							}	
+							flagNMaxU=0;
 						}
-						
 						else
-							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[i].nome);
+							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[y].nome);
 						
 					}
 

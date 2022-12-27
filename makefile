@@ -1,5 +1,8 @@
 CC=gcc
 
+FUSERS=-D DEBUG
+FITEMS=-D DEBUG
+FPROMOTORES=-D DEBUG
 
 frontendo: frontend.c header.h
 	gcc frontend.c -c
@@ -11,7 +14,7 @@ frontend: frontendo
 	gcc frontend.o users_lib.o -o frontend
 
 backend: backendo
-	gcc backend.o users_lib.o -o backend -lpthread
+	gcc backend.o users_lib.o -o backend -lpthread ${FUSERS} ${FITEMS} ${FPROMOTORES}
 
 all: frontend backend
 
@@ -20,6 +23,7 @@ clean:
 	rm frontend
 	rm frontend.o
 	rm backend.o
+	rm CLIENTE[[:digit:]]*
 
 cleanB:
 	rm BACKENDFIFO
