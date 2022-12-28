@@ -1,15 +1,21 @@
 //===================== BACKEND =====================//
 #include "header.h"
 
-
+/*--------Variaveis Globais-------*/
 int flagNMaxI=0;
 char fifo[40];
+//necessário pela impossibilidade mais do que uma struct para thread
+Cliente clientesOnline[NMAXUSERS]; 
+respostaBF envia;
+/*--------------------------------*/
 
+void enviaMensagemU( char resposta[]){
 
-void enviaMensagemU(Cliente clientesOnline[], char resposta[]){
-
-	int fdr, n, fd;
+	int fdr, n;
 	strcpy(envia.resposta, resposta);
+	if(strcmp(envia.resposta, "A plataforma vai encerrar")==0)
+		envia.kill=1;
+
 	for(int i=0; i<NMAXUSERS && strcmp(clientesOnline[i].nome, "a")!=0; i++){
 		sprintf(fifo, FRONTENDFIFO, clientesOnline[i].pid);
 		fdr = open(fifo, O_RDWR);  //bloqueia - se não houver clientes
@@ -86,11 +92,26 @@ void *imprimePromotor(void *a){
 }
 
 void *decreaseTime(void *leilao){
+	char mensagemG[200];
     int y=0;
    	Leilao *tleilao = (Leilao*) leilao;
     do{
         for (int i = 0; i<NMAXITEMS && strcmp(tleilao[i].nome, "a")!=0; i++) {
              if(tleilao[i].duracao<=1){
+				if(strcmp(tleilao[i].nomeLic, "-")!=0){
+					if(getUserBalance(tleilao[i].nomeLic)>=tleilao[i].valbase){
+
+						updateUserBalance(tleilao[i].nomeLic, getUserBalance(tleilao[i].nomeLic)-tleilao[i].valbase);
+						updateUserBalance(tleilao[i].nomeVend, getUserBalance(tleilao[i].nomeVend)+tleilao[i].valbase);
+						sprintf(mensagemG, "O produto '%s' com ID=%d, da cat. '%s' foi adquirido pelo utilizador '%s' por %d€", tleilao[i].nome, tleilao[i].ID, tleilao[i].categoria, tleilao[i].nomeLic, tleilao[i].valbase);
+					
+					}else
+						sprintf(mensagemG, "O utilizador '%s' nao teve fundos para ficar com o produto de ID=%d", tleilao[i].nomeLic, tleilao[i].ID);
+				}else
+					sprintf(mensagemG, "O produto '%s' com ID=%d, da cat. '%s' saiu de leilao, sem comprador", tleilao[i].nome, tleilao[i].ID, tleilao[i].categoria);
+
+					enviaMensagemU(mensagemG);
+
                 for (y = i; y<NMAXITEMS && strcmp(tleilao[y].nome, "a")!=0; y++) {
 					if(y<NMAXITEMS-1)
                     	tleilao[y] = tleilao[y+1];
@@ -164,8 +185,14 @@ int main(char *envp[]){
 	char arg5[20];
 	char arg6[20];
 	int b=0, c=0;
+	int valido=0;
 
-	char mensagemG[100];
+	char mensagemG[200];
+	
+	respostaBF envia;
+	envia.kill=0;
+
+	
 	char filePName[30];
 	sprintf(filePName,"./%s",fusers);
 
@@ -174,7 +201,7 @@ int main(char *envp[]){
 	
 
 	msgBF comunicacao;
-	Cliente clientesOnline[NMAXUSERS];
+	
 	int flagNMaxU=0;
 	strcpy(clientesOnline[0].nome, "a");
 	
@@ -226,7 +253,7 @@ int main(char *envp[]){
 	if(contadorItens==NMAXITEMS)
 		flagNMaxI=1;
 	
-	int id=contadorItens+1;
+	int id=items[contadorItens-1].ID+1;
 	strcpy(items[contadorItens].nome, "a");
 	pthread_t tempo;
 
@@ -365,13 +392,27 @@ int main(char *envp[]){
 						printf("\nAtualiza os promotores\n");
 					}
 					else if(strcmp(com,"close\n")==0){
+
+						f = fopen(fitems, "w");
+
+						if (f == NULL) {
+							perror("Erro ao abrir o arquivo");
+						}
+						for(int g=0; strcmp(items[g].nome, "a")!=0 && g<NMAXITEMS;g++)
+							fprintf(f, "%d %s %s %d %d %d %s %s\n", items[g].ID, items[g].nome, items[g].categoria, items[g].valbase, items[g].valcp, items[g].duracao, items[g].nomeVend, items[g].nomeLic);
+						fclose(f);
+
 						printf("\nA plataforma vai encerrar\n");
+
+						strcpy(mensagemG, "A plataforma vai encerrar");
+						enviaMensagemU(mensagemG);
+
 						close(fd);
 						unlink(BACKENDFIFO);
 							
 						a.kill=1;	
-						pthread_join(promotor, NULL);
-						//exit(-1);
+						//pthread_join(promotor, NULL);
+						exit(-1);
 					}
 					else
 						printf("\nComando invalido!\n");
@@ -473,9 +514,9 @@ int main(char *envp[]){
 
 					else if(comunicacao.codMsg==1){
 						
-
+						valido=0;
 						if(flagNMaxI!=1){
-
+							
 							space=0;
 							b=0; 
 							c=0;
@@ -489,7 +530,7 @@ int main(char *envp[]){
 									if(space==0)
 										arg1[c]=comunicacao.mensagem[i];
 									if(space==1){
-										arg1[c]='\0';
+										arg1[b]='\0';
 										arg2[c]=comunicacao.mensagem[i];}
 									if(space==2){
 										arg2[b]='\0';
@@ -527,7 +568,8 @@ int main(char *envp[]){
 									}
 								}
 							strcpy(comunicacao.resposta, "ITEM ADICIONADO AO LEILÃO!");
-
+							sprintf(mensagemG, "Produto '%s' com ID=%d, da cat. '%s' adicionado ao leilao pelo utilizador '%s' com VB:%d€ e VC:%d€", arg1, id-1, arg2, arg6, atoi(arg3), atoi(arg4));
+							valido=1;
 							}else
 								strcpy(comunicacao.resposta, "[ERRO] - DADOS INVÁLIDOS!");
 						}else
@@ -541,6 +583,9 @@ int main(char *envp[]){
 						}
 						else
 							printf("[ERRO] - ao enviar dados a utilizador");
+
+						if(valido==1)
+							enviaMensagemU(mensagemG);
 						
 					}
 					else if(comunicacao.codMsg==2){
@@ -677,7 +722,7 @@ int main(char *envp[]){
 						b=0; 
 						c=0;
 						space=0;
-						int valido=0;
+						valido=0;
 						for(int i=0; comunicacao.mensagem[i] != '\0'; i++, c++){
 							if(comunicacao.mensagem[i]==' '){
 								space++;
@@ -701,38 +746,41 @@ int main(char *envp[]){
 						
 						for (int i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
 							if(items[i].ID == atoi(arg1)){
-								if(items[i].valcp==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
-									
-									updateUserBalance(arg3, getUserBalance(arg3)-items[i].valcp);
-									updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+items[i].valcp);
-									for (int y = i; y<NMAXITEMS && strcmp(items[y].nome, "a")!=0; y++) { //apagar o item da estrutura
-										if(y<NMAXITEMS-1)
-                    						items[y] = items[y+1];
-										if(y==NMAXITEMS-1){
-											strcpy(items[y].nome,"a");
-											flagNMaxI=0;
-											break;
-										}
-                					}
-									
-									strcpy(comunicacao.resposta, "Comprado pelo VC com sucesso!");
-									sprintf(mensagemG, "O produto com ID=%d foi comprado pelo utilizador '%s' por %d€", items[i].ID, arg3, atoi(arg2));
-									valido=1;
-									break;
-								}
-								else if(items[i].valbase<atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //licitacao do produto
-									strcpy(items[i].nomeLic,arg3);
-									items[i].valbase=atoi(arg2);
+								if(strcmp(items[i].nomeVend, arg3)!=0){
+									if(items[i].valcp==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
+										
+										updateUserBalance(arg3, getUserBalance(arg3)-items[i].valcp);
+										updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+items[i].valcp);
+										sprintf(mensagemG, "O produto '%s' com ID=%d, da cat. '%s' foi comprado pelo utilizador '%s' por %d€", items[i].nome, items[i].ID, items[i].categoria, arg3, atoi(arg2));
 
-									strcpy(comunicacao.resposta, "Produto Licitado com sucesso!");
-									sprintf(mensagemG, "paaaaaaaaaaaaaaaaaaaaaaaaaa %d", atoi(arg2));
-									valido=1;
-									break;
+										for (int y = i; y<NMAXITEMS && strcmp(items[y].nome, "a")!=0; y++) { //apagar o item da estrutura
+											if(y<NMAXITEMS-1)
+												items[y] = items[y+1];
+											if(y==NMAXITEMS-1){
+												strcpy(items[y].nome,"a");
+												flagNMaxI=0;
+												break;
+											}
+										}
+			
+										strcpy(comunicacao.resposta, "Comprado pelo VC com sucesso!");
+										valido=1;
+									}
+									else if(items[i].valbase<atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //licitacao do produto
+										strcpy(items[i].nomeLic,arg3);
+										items[i].valbase=atoi(arg2);
+
+										strcpy(comunicacao.resposta, "Produto Licitado com sucesso!");
+										sprintf(mensagemG, "O produto com ID=%d foi Licitado pelo utilizador '%s' no valor de %d€", atoi(arg1), arg3, atoi(arg2));
+										valido=1;
+									}else
+										strcpy(comunicacao.resposta, "Nao tem fundos necessários!");
 								}else
-									strcpy(comunicacao.resposta, "Nao tem fundos necessários!");
+									strcpy(comunicacao.resposta, "Não pode comprar o próprio produto!");
 								break;
 							}else
 								strcpy(comunicacao.resposta, "O produto mencionado nao existe!");
+							printf("!%d!",i);
 						}
 						saveUsersFile(fusers);
 
@@ -747,7 +795,7 @@ int main(char *envp[]){
 
 						if(valido==1){
 
-							enviaMensagemU(clientesOnline, mensagemG);
+							enviaMensagemU(mensagemG);
 						}
 
 					}

@@ -3,27 +3,6 @@
 
 char fifo[40];
 
-/*void *receberInfo(void *a){
-	fd_set fds1;
-	int sel1;
-	int fdr1, n;
-   
-    do{
-			
-			fdr1= open(fifo, O_RDONLY);
-			if((n = read(fdr1, &envia, sizeof(respostaBF)))>0 && envia.cod==1){
-				close(fdr1);
-				printf("%s\n",  envia.resposta);
-			}envia.cod=0;
-			/*else
-				printf("[ERRO] - Ao receber do backend\n");
-		
-			
-        
-    }while(1);
-
-}*/
-
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (fifo);
                     printf("\nadeus\n");
@@ -118,6 +97,8 @@ int main(int argc, char*argv[]){
 	char dur[10];
 	int VARIMPOR=0;
 	fflush(stdin);
+
+	respostaBF envia;
 
 	fd_set fds;
 	int sel;
@@ -515,6 +496,7 @@ int main(int argc, char*argv[]){
 				//mandar a struct ao backend
 				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					close(fdr);
 					unlink (fifo);
 					exit(-1);
 				}
@@ -535,9 +517,15 @@ int main(int argc, char*argv[]){
 						if((n = read(fdr, &envia, sizeof(respostaBF)))>0){
 							
 							printf("%s\n",  envia.resposta);
+							if(envia.kill==1){
+								close(fdr);
+								unlink (fifo);
+								exit(-1);
+							}
 						}
 						else
 							printf("[ERRO] - Ao receber do backend\n");
+				
 			}
 
 			else if(VARIMPOR==1){

@@ -1,4 +1,1 @@
-1 consola eletronica 100 300 150 geraldes pedro
-2 prato cozinha 5 20 150 pedro -
-4 garfo cozinha 5 20 150 pedro -
-5 mesa sala 5 20 150 geraldes pedro
+5 conami com 123 123 2 geraldes -

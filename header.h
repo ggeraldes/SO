@@ -47,9 +47,10 @@ typedef struct{			   		//-------------------COMUNICAÇÃO BACKEND-FRONTEND------
 }msgBF;
 
 typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------------------
-	char resposta[100];  	
+	char resposta[200]; 
+	int kill;    //se tiver =1 os frontend fecham 	
 }respostaBF;
-respostaBF envia;
+
 
 typedef struct cliente{
 	char nome[20];
