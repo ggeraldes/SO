@@ -24,9 +24,9 @@
 #define FRONTENDFIFO "CLIENTE%d"
 char CLIENTE_FIFO_FINAL[100];
 
-#define NMAXUSERS 2
-#define NMAXPROMOS 2
-#define NMAXITEMS 5
+#define NMAXUSERS 20
+#define NMAXPROMOS 10
+#define NMAXITEMS 30
 
 
 
@@ -69,12 +69,11 @@ typedef struct leilao{
 	char nomeLic[20];
 }Leilao;
 
-/*typedef struct promotor{
-	Item item;
-	bool promocao;
+typedef struct promotor{
+	char ficheiro[30];
+	int pidP;
 }Promotor;
 
-Promotor ativos[NMAXPROMOS];*/
 
 
 
