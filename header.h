@@ -17,6 +17,7 @@
 #include <sys/select.h>
 #include <pthread.h>
 #include <time.h>
+#include <math.h>
 #include "users_lib.h"
 
 #define BACKENDFIFO "BACKENDFIFO"
@@ -67,11 +68,16 @@ typedef struct leilao{
 	int duracao;
 	char nomeVend[20];
 	char nomeLic[20];
+	//caso haja promocoes
+	int prom;
+	int promDur;
+	int pidProm;
 }Leilao;
 
 typedef struct promotor{
 	char ficheiro[30];
 	int pidP;
+	//pthread_mutex_t *m;
 }Promotor;
 
 

@@ -570,13 +570,22 @@ int main(int argc, char*argv[]){
 						
 						
 						if((n = read(fdr, &temp, sizeof(temp)))>0){
-							int g=0;
+							int g=0, valorCj=0;
 							for(g=0; strcmp(temp[g].nome, "a")!=0 && g<NMAXITEMS;g++){
-									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, temp[g].valcp, temp[g].duracao, temp[g].nomeVend);
+	
+								if(temp[g].prom!=0)
+									valorCj=temp[g].valcp-temp[g].valcp*temp[g].prom/100;
+								else
+									valorCj=temp[g].valcp;
+
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", temp[g].ID, temp[g].nome, temp[g].categoria, temp[g].valbase, valorCj, temp[g].duracao, temp[g].nomeVend);
 									if(strcmp(temp[g].nomeLic, "-")!=0)
-										printf(", ult.Lic.: %s", temp[g].nomeLic);
+										printf(", ult.Lic.: %s.", temp[g].nomeLic);
 									else
 										printf(", ainda sem licitacoes.");
+							
+									if(temp[g].prom!=0)
+										printf(" Em prom: %d, dur.:%d", temp[g].prom, temp[g].promDur);
 								}
 								if(g==0)
 									printf("Lista vazia\n");

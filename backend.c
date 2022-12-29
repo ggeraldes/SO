@@ -8,6 +8,7 @@ char *fusers="FUSERS.txt";
 //necessário pela impossibilidade mais do que uma struct para thread
 Cliente clientesOnline[NMAXUSERS]; 
 respostaBF envia;
+Leilao items[NMAXITEMS];
 /*--------------------------------*/
 
 void enviaMensagemU( char resposta[]){
@@ -45,9 +46,10 @@ void *imprimePromotor(void *a){
 	Promotor *ta = (Promotor*) a;
 
 	/*-----------------PROMOTOR-------------------*/
-	
+
+				char cat[20], prom[10], dur[10];
 				int p_b[2];
-				int size, pid;
+				int size;
 				int estado;	
 				int isto=0;
 				pipe(p_b);
@@ -82,15 +84,57 @@ void *imprimePromotor(void *a){
 				//pai continua a correr
 				close(p_b[1]);
 				
-				while((size = read(p_b[0], res, 99))>0 /*&& ta->kill!=1*/){
-					res[size] = '\0';
-						printf("%s", res);
+					while((size = read(p_b[0], res, 99))>0){
+						//pthread_mutex_lock(ta->m);  
+							res[size] = '\0';
+							if(strcmp(res, "\n")!=0){
+								printf("%s", res);
 
-				}
-				close(p_b[0]);
+								for(int i=0, y=0, b=0, count=0;res[i]!='\0'; i++, y++){
+									if(res[i]==' '){
+										count++;
+										b=y;
+										y=-1;
+									}
+									else{
+										if(count==0)
+											cat[y]=res[i];
+										if(count==1){
+											cat[b]='\0';
+											prom[y]=res[i];
+										}
+										if(count==2){
+											prom[b]='\0';
+											if(res[i]=='\n')
+												dur[y]='\0';
+											else
+												dur[y]=res[i];
+										}
+									}			
+								}
+
+								for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
+									if(strcmp(cat, items[i].categoria)==0){
+										items[i].promDur=atoi(dur);
+										items[i].prom=atoi(prom);
+										items[i].pidProm=ta->pidP;
+									}
+								}
+								
+							}
+						//pthread_mutex_unlock(ta->m);
+					}
 				
-
+				close(p_b[0]);
 				wait(&estado);
+
+				for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
+					if(ta->pidP==items[i].pidProm){
+						items[i].promDur=0;
+						items[i].prom=0;
+						items[i].pidProm=0;
+					}
+				}
 			
 	
     pthread_exit(NULL);
@@ -102,7 +146,7 @@ void *decreaseTime(void *leilao){
    	Leilao *tleilao = (Leilao*) leilao;
     do{
         for (int i = 0; i<NMAXITEMS && strcmp(tleilao[i].nome, "a")!=0; i++) {
-             if(tleilao[i].duracao<=1){
+        	if(tleilao[i].duracao<=1){
 				if(strcmp(tleilao[i].nomeLic, "-")!=0){
 					if(getUserBalance(tleilao[i].nomeLic)>=tleilao[i].valbase){
 
@@ -128,7 +172,14 @@ void *decreaseTime(void *leilao){
                 }
 				flagNMaxI=0;
             }
+			if(tleilao[i].promDur<=1 && tleilao[i].prom!=0){
+				tleilao[i].prom=0;
+				tleilao[i].promDur=0;
+				tleilao[i].pidProm=0;
+			}
             tleilao[i].duracao--; 
+			if(tleilao[i].prom!=0)
+				tleilao[i].promDur--;
         }
         sleep(1);
     }while(1);
@@ -143,7 +194,16 @@ void handler_sigalarm(int s,siginfo_t *t, void *v){
 
 }
 
+int getValueProm(int i){
 
+	if(items[i].prom!=0){
+	return items[i].valcp-items[i].valcp*items[i].prom/100;
+		}else
+	return items[i].valcp;
+	
+}
+
+/*------------------------------------------------------------------------------------------------MAIN---------------------------------------------------------------------*/
 int main(char *envp[]){
 
 	struct sigaction sa;
@@ -208,7 +268,7 @@ int main(char *envp[]){
 	int ch=0;
 	char palavra[20];
 
-	Leilao items[NMAXITEMS];
+	
 	Leilao temp[NMAXITEMS]; //para envios expecificos
 	FILE *f = fopen(fitems, "r");
 
@@ -241,6 +301,7 @@ int main(char *envp[]){
 				if (count!=1)
 					count--;
 				else{
+					items[i].prom=0;
 					count=8;
 					i++;
 					contadorItens++;
@@ -272,6 +333,8 @@ int main(char *envp[]){
 
 	/*---------------------------------PROMOTORES---------------------------------*/
 	Promotor ativos[NMAXPROMOS];
+	//pthread_mutex_t  mutex;  
+    //pthread_mutex_init(&mutex, NULL); //inicializar
 
 	i=0;
 	count=0;
@@ -287,6 +350,7 @@ int main(char *envp[]){
 			if(palavra[strlen(palavra)-1] == '\n')
 				palavra[strlen(palavra) - 1] = '\0';
 			strcpy(ativos[i].ficheiro,palavra);
+			//ativos[i].m=&mutex;
 			count++;
 			i++;
 			
@@ -295,9 +359,12 @@ int main(char *envp[]){
 		fclose(f);
 	}
 	contadorPromotores=count;
-
+	if(contadorPromotores<NMAXPROMOS-1)
+		strcpy(ativos[contadorPromotores].ficheiro, "a");
+		
 	pthread_t tpromotores[contadorPromotores];
-	strcpy(ativos[contadorPromotores].ficheiro, "a");
+	
+
 	for (int i=0 ; i<contadorPromotores ; i++ ){
       if (pthread_create (&tpromotores[i],NULL,&imprimePromotor,&ativos[i])!=0)
 	  	printf("promotor nao irá funcionar!");
@@ -448,7 +515,9 @@ int main(char *envp[]){
 										}
 									}
 
-								}
+								}else
+									printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
+
 								break;
 							}
 
@@ -490,18 +559,23 @@ int main(char *envp[]){
 
 					}
 					else if(strcmp(com,"list\n")==0){
+						
 						if(contadorItens==-1){
 							printf("Aconteceu um ERRO a abrir o ficheiro '%s'", fitems);
 						}
 						else{
 							printf("\nLista os itens em Leilao:\n");
 							if(verificaItems(contadorItens)==1){
+								
 								for(int g=0; strcmp(items[g].nome, "a")!=0 && g<NMAXITEMS;g++){
-									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", items[g].ID, items[g].nome, items[g].categoria, items[g].valbase, items[g].valcp, items[g].duracao, items[g].nomeVend);
+									
+									printf("\nID: %d, Nome: %s, Categ.: %s, VB: %d€, VC: %d€, dur: %ds, vend.: %s", items[g].ID, items[g].nome, items[g].categoria, items[g].valbase, getValueProm(g), items[g].duracao, items[g].nomeVend);
 									if(strcmp(items[g].nomeLic, "-")!=0)
-										printf(", ult.Lic.: %s", items[g].nomeLic);
+										printf(", ult.Lic.: %s.", items[g].nomeLic);
 									else
 										printf(", ainda sem licitacoes.");
+									if(items[g].prom!=0)
+										printf(" Em prom: %d, dur.:%d", items[g].prom, items[g].promDur);
 								}
 							printf("\n");
 							}
@@ -524,35 +598,64 @@ int main(char *envp[]){
 						i=0;
 						count=0;
 						f = fopen(fpromotor, "r");
-
+						int valida=0;
+						int guarda=0;
+						int index;
+						Promotor temp[NMAXPROMOS];
 						if (f == NULL) {
 							perror("[ERRO] - Ao abrir o arquivo de promotores!");
 						}
 						else{
 
-							for(int g=0; strcmp(ativos[g].ficheiro, "a")!=0 && g<NMAXPROMOS; g++){
-       						if (kill(ativos[g].pidP, SIGUSR1)!=-1)
-							printf("dsss");
-							}
-
 							while (fgets(palavra, sizeof(palavra), f) && count<NMAXPROMOS) {
-								
+								valida=0;
 								if(palavra[strlen(palavra)-1] == '\n')
-									palavra[strlen(palavra) - 1] = '\0';
-								strcpy(ativos[i].ficheiro,palavra);
-								count++;
-								i++;
-								
+										palavra[strlen(palavra) - 1] = '\0';
+
+								for (int g = 0; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+									if (strcmp(ativos[g].ficheiro, palavra) == 0){
+										temp[count++]=ativos[g];
+										valida=1; // Encontrou o elemento
+										guarda=g;
+										break;
+									}	
+									
+								}
+								if(valida==1){
+									for (int g = guarda; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+										if(g<NMAXPROMOS-1)
+											ativos[g] = ativos[g+1];
+										if(g==NMAXITEMS-1){
+											strcpy(ativos[g].ficheiro,"a");
+											break;
+										}
+									}	
+								}else{
+									strcpy(temp[count++].ficheiro,palavra);
+								}
+								i++;	
 
 							}
 							fclose(f);
 						}
+						if(count<NMAXPROMOS-1)
+							strcpy(temp[count].ficheiro, "a");
+
+						for (int g = 0; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+							if (kill(ativos[g].pidP, SIGUSR1)==-1)
+								printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
+							
+						}
+
+						for(int g=0; g<NMAXPROMOS; g++)
+							ativos[g]=temp[g];
 
 						pthread_t tpromotores[count];
-						strcpy(ativos[count].ficheiro, "a");
 						for (int i=0 ; i<count ; i++ ){
-						if (pthread_create (&tpromotores[i],NULL,&imprimePromotor,&ativos[i])!=0)
-							printf("promotor nao irá funcionar!");
+							if(ativos[i].pidP==0){
+								if (pthread_create (&tpromotores[i],NULL,&imprimePromotor,&ativos[i])!=0)
+									printf("promotor nao irá funcionar!");
+							}
 						}
 
 					}
@@ -724,6 +827,7 @@ int main(char *envp[]){
 										items[i].duracao=atoi(arg5);
 										strcpy(items[i].nomeVend, arg6);
 										strcpy(items[i].nomeLic, "-");
+										items[i].prom=0;
 										if(i<NMAXITEMS-1)
 											strcpy(items[i+1].nome,"a");
 										else if(i==NMAXITEMS-1){
@@ -909,13 +1013,15 @@ int main(char *envp[]){
 							}
 						}arg3[c]='\0';
 						int i=0;
-						for (i = 0; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+						for (i = 0 ; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
 							if(items[i].ID == atoi(arg1)){
+
+
 								if(strcmp(items[i].nomeVend, arg3)!=0){
-									if(items[i].valcp==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
+									if(getValueProm(i)==atoi(arg2) && getUserBalance(arg3)>=atoi(arg2)){ //se fizer o pedido compra já
 										
-										updateUserBalance(arg3, getUserBalance(arg3)-items[i].valcp);
-										updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+items[i].valcp);
+										updateUserBalance(arg3, getUserBalance(arg3)-getValueProm(i));
+										updateUserBalance(items[i].nomeVend, getUserBalance(items[i].nomeVend)+getValueProm(i));
 										sprintf(mensagemG, "O produto '%s' com ID=%d, da cat. '%s' foi comprado pelo utilizador '%s' por %d€", items[i].nome, items[i].ID, items[i].categoria, arg3, atoi(arg2));
 
 										for (int y = i; y<NMAXITEMS && strcmp(items[y].nome, "a")!=0; y++) { //apagar o item da estrutura
