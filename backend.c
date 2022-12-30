@@ -3,8 +3,9 @@
 
 /*--------Variaveis Globais-------*/
 int flagNMaxI=0;
+int flagNMaxU=0;
 char fifo[40];
-char *fusers="FUSERS.txt";
+char *fusers;
 //necessário pela impossibilidade mais do que uma struct para thread
 Cliente clientesOnline[NMAXUSERS]; 
 respostaBF envia;
@@ -32,6 +33,28 @@ void enviaMensagemU( char resposta[]){
 
 }
 
+
+void *check_active_users(void *a) {
+  // Verifica os utilizadores ativos e remove os inativos
+  do{
+		for (int i = 0; i < NMAXUSERS && strcmp(clientesOnline[i].nome, "a")!=0; i++) {
+			time_t now = time(NULL); // obtém a hora atual
+			if (now - clientesOnline[i].last_heartbeat > INACTIVE_TIMEOUT) {
+				flagNMaxU=0;
+			// utilizadore inativo, remove da struct
+				for(int g=i; g < NMAXUSERS && strcmp(clientesOnline[g].nome, "a")!=0; g++){
+					if(g<NMAXUSERS-1)
+						clientesOnline[g] = clientesOnline[g+1];
+					if(g==NMAXUSERS-1){
+						strcpy(clientesOnline[g].nome,"a");
+					}
+				}
+				i--;
+			}
+		}
+  }while(1);
+}
+
 int verificaItems (int contadorItems){
 		if(contadorItems<=0)
 			return -1;
@@ -46,8 +69,8 @@ void *imprimePromotor(void *a){
 	Promotor *ta = (Promotor*) a;
 
 	/*-----------------PROMOTOR-------------------*/
-
 				char cat[20], prom[10], dur[10];
+				char promocao[200];
 				int p_b[2];
 				int size;
 				int estado;	
@@ -65,7 +88,7 @@ void *imprimePromotor(void *a){
 					action.sa_handler = sig_handler;
 					sigemptyset(&action.sa_mask);
 					action.sa_flags = 0;
-
+					
 					// Registar o manipulador de sinais para o sinal SIGUSR1
 					if (sigaction(SIGUSR1, &action, NULL) == -1) {
 					perror("sigaction");
@@ -80,49 +103,54 @@ void *imprimePromotor(void *a){
 					exit(-1);
 						
 				}
-				ta->pidP=f;	
+				
 				//pai continua a correr
 				close(p_b[1]);
-				
+				ta->pidP=f;	
 					while((size = read(p_b[0], res, 99))>0){
-						//pthread_mutex_lock(ta->m);  
+						  
 							res[size] = '\0';
 							if(strcmp(res, "\n")!=0){
-								printf("%s", res);
+								pthread_mutex_lock(ta->m);
+									printf("\n'%s':%s", ta->ficheiro, res);
+									
 
-								for(int i=0, y=0, b=0, count=0;res[i]!='\0'; i++, y++){
-									if(res[i]==' '){
-										count++;
-										b=y;
-										y=-1;
+									for(int i=0, y=0, b=0, count=0;res[i]!='\0'; i++, y++){
+										if(res[i]==' '){
+											count++;
+											b=y;
+											y=-1;
+										}
+										else{
+											if(count==0)
+												cat[y]=res[i];
+											if(count==1){
+												cat[b]='\0';
+												prom[y]=res[i];
+											}
+											if(count==2){
+												prom[b]='\0';
+												if(res[i]=='\n')
+													dur[y]='\0';
+												else
+													dur[y]=res[i];
+											}
+										}			
 									}
-									else{
-										if(count==0)
-											cat[y]=res[i];
-										if(count==1){
-											cat[b]='\0';
-											prom[y]=res[i];
-										}
-										if(count==2){
-											prom[b]='\0';
-											if(res[i]=='\n')
-												dur[y]='\0';
-											else
-												dur[y]=res[i];
-										}
-									}			
-								}
 
-								for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
-									if(strcmp(cat, items[i].categoria)==0){
-										items[i].promDur=atoi(dur);
-										items[i].prom=atoi(prom);
-										items[i].pidProm=ta->pidP;
+									for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
+										if(strcmp(cat, items[i].categoria)==0){
+											items[i].promDur=atoi(dur);
+											items[i].prom=atoi(prom);
+											items[i].pidProm=ta->pidP;
+										}
 									}
-								}
-								
+									sprintf(promocao, "Promocao nos produtos da cat.:%s de %d%%", cat, atoi(prom));
+									enviaMensagemU(promocao);
+								pthread_mutex_unlock(ta->m);
 							}
-						//pthread_mutex_unlock(ta->m);
+							
+						
 					}
 				
 				close(p_b[0]);
@@ -133,6 +161,8 @@ void *imprimePromotor(void *a){
 						items[i].promDur=0;
 						items[i].prom=0;
 						items[i].pidProm=0;
+						sprintf(promocao, "O produto com ID:%d já não tem promocao", items[i].ID);
+							enviaMensagemU(promocao);
 					}
 				}
 			
@@ -180,6 +210,7 @@ void *decreaseTime(void *leilao){
             tleilao[i].duracao--; 
 			if(tleilao[i].prom!=0)
 				tleilao[i].promDur--;
+			
         }
         sleep(1);
     }while(1);
@@ -217,7 +248,7 @@ int main(char *envp[]){
 
 	char *fpromotor="FPROMOTORES.txt";
 	char *fitems="FITEMS.txt";
-
+	fusers="FUSERS.txt";
 	if(getenv("FPROMOTORES")){
   		fpromotor = getenv("FPROMOTORES");
 	}
@@ -257,7 +288,7 @@ int main(char *envp[]){
 
 	msgBF comunicacao;
 	
-	int flagNMaxU=0;
+	
 	strcpy(clientesOnline[0].nome, "a");
 	/*--------------------------------------------*/
 	
@@ -331,10 +362,18 @@ int main(char *envp[]){
 	
 	/*----------------------------------------------------------------------------*/
 
+	/*---------------------------------HEARTBEAT---------------------------------*/
+
+	pthread_t checkHeartBeat;
+	 if (pthread_create (&checkHeartBeat,NULL,&check_active_users,NULL)!=0)
+	  	printf("heartbeat checker nao irá funcionar!");
+
+	/*----------------------------------------------------------------------------*/
+
 	/*---------------------------------PROMOTORES---------------------------------*/
 	Promotor ativos[NMAXPROMOS];
-	//pthread_mutex_t  mutex;  
-    //pthread_mutex_init(&mutex, NULL); //inicializar
+	pthread_mutex_t  mutex;  
+    pthread_mutex_init(&mutex, NULL); //inicializar
 
 	i=0;
 	count=0;
@@ -350,7 +389,7 @@ int main(char *envp[]){
 			if(palavra[strlen(palavra)-1] == '\n')
 				palavra[strlen(palavra) - 1] = '\0';
 			strcpy(ativos[i].ficheiro,palavra);
-			//ativos[i].m=&mutex;
+			ativos[i].m=&mutex;
 			count++;
 			i++;
 			
@@ -359,14 +398,15 @@ int main(char *envp[]){
 		fclose(f);
 	}
 	contadorPromotores=count;
-	if(contadorPromotores<NMAXPROMOS-1)
+	printf("!%d!",contadorPromotores);
+	if(contadorPromotores<NMAXPROMOS)
 		strcpy(ativos[contadorPromotores].ficheiro, "a");
 		
-	pthread_t tpromotores[contadorPromotores];
+	//pthread_t tpromotores[contadorPromotores];
 	
-
+	
 	for (int i=0 ; i<contadorPromotores ; i++ ){
-      if (pthread_create (&tpromotores[i],NULL,&imprimePromotor,&ativos[i])!=0)
+      if (pthread_create (&ativos[i].tid,NULL,&imprimePromotor,&ativos[i])!=0)
 	  	printf("promotor nao irá funcionar!");
 	}
 
@@ -388,7 +428,7 @@ int main(char *envp[]){
 	/*-----------------------------Interação com o cliente------------------------*/
 
 	int fd, n, fdr;
-	int sel, sel1;
+	int sel;
 	
 	fd_set fds;
 
@@ -506,17 +546,26 @@ int main(char *envp[]){
 								valido=1;
 								if(kill(ativos[g].pidP, SIGUSR1)!=-1){
 
-									for (int y = g; strcmp(ativos[y].ficheiro, "a")!=0 && y<NMAXPROMOS; y++) { //apagar o item da estrutura
-										if(y<NMAXPROMOS-1)
-											ativos[y] = ativos[y+1];
-										if(y==NMAXITEMS-1){
-											strcpy(ativos[y].ficheiro,"a");
-											break;
+									if (pthread_join(ativos[g].tid, NULL)!=0)
+											printf("[ERRO] - pthread_join\n");
+									else{
+										for (int y = g; strcmp(ativos[y].ficheiro, "a")!=0 && y<NMAXPROMOS; y++) { //apagar o item da estrutura
+											if(y<NMAXPROMOS-1){
+												ativos[y] = ativos[y+1];
+												
+											}
+											else if(y==NMAXPROMOS-1){
+												strcpy(ativos[y].ficheiro,"a");
+												ativos[y].pidP=0;
+												ativos[y].tid=0;
+											}
 										}
+										
 									}
 
-								}else
+								}else{
 									printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
+								}
 
 								break;
 							}
@@ -575,7 +624,7 @@ int main(char *envp[]){
 									else
 										printf(", ainda sem licitacoes.");
 									if(items[g].prom!=0)
-										printf(" Em prom: %d, dur.:%d", items[g].prom, items[g].promDur);
+										printf(" Em prom: %d%%, dur.:%d", items[g].prom, items[g].promDur);
 								}
 							printf("\n");
 							}
@@ -600,7 +649,6 @@ int main(char *envp[]){
 						f = fopen(fpromotor, "r");
 						int valida=0;
 						int guarda=0;
-						int index;
 						Promotor temp[NMAXPROMOS];
 						if (f == NULL) {
 							perror("[ERRO] - Ao abrir o arquivo de promotores!");
@@ -612,7 +660,7 @@ int main(char *envp[]){
 								if(palavra[strlen(palavra)-1] == '\n')
 										palavra[strlen(palavra) - 1] = '\0';
 
-								for (int g = 0; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+								for (int g = 0; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
 									if (strcmp(ativos[g].ficheiro, palavra) == 0){
 										temp[count++]=ativos[g];
 										valida=1; // Encontrou o elemento
@@ -622,38 +670,50 @@ int main(char *envp[]){
 									
 								}
 								if(valida==1){
-									for (int g = guarda; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
-										if(g<NMAXPROMOS-1)
+									for (int g = guarda; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+										if(g<NMAXPROMOS-1){
 											ativos[g] = ativos[g+1];
-										if(g==NMAXITEMS-1){
+										}
+										else if(g==NMAXPROMOS-1){
 											strcpy(ativos[g].ficheiro,"a");
+											ativos[g].pidP=0;
+											temp[g].tid=0;
 											break;
 										}
 									}	
+									
 								}else{
-									strcpy(temp[count++].ficheiro,palavra);
+									strcpy(temp[count].ficheiro,palavra);
+									temp[count].pidP=0;
+									temp[count].tid=0;
+									count++;
 								}
 								i++;	
 
 							}
 							fclose(f);
 						}
-						if(count<NMAXPROMOS-1)
+						if(count<NMAXPROMOS)
 							strcpy(temp[count].ficheiro, "a");
 
-						for (int g = 0; g < NMAXITEMS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
+						for (int g = 0; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
 							if (kill(ativos[g].pidP, SIGUSR1)==-1)
 								printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
+							else{
+								if (pthread_join(ativos[g].tid, NULL)!=0)
+									printf("[ERRO] - pthread_join\n");
+							}
 							
 						}
 
 						for(int g=0; g<NMAXPROMOS; g++)
 							ativos[g]=temp[g];
 
-						pthread_t tpromotores[count];
+						//pthread_t tp[count];
+
 						for (int i=0 ; i<count ; i++ ){
 							if(ativos[i].pidP==0){
-								if (pthread_create (&tpromotores[i],NULL,&imprimePromotor,&ativos[i])!=0)
+								if (pthread_create (&ativos[i].tid,NULL,&imprimePromotor,&ativos[i])!=0)
 									printf("promotor nao irá funcionar!");
 							}
 						}
@@ -741,6 +801,7 @@ int main(char *envp[]){
 											strcpy(clientesOnline[i].nome,arg1);
 											strcpy(clientesOnline[i].pw,arg2);
 											clientesOnline[i].pid=comunicacao.pid;
+											clientesOnline[i].last_heartbeat=time(NULL);;
 											if(i<NMAXUSERS-1){
 												strcpy(clientesOnline[i+1].nome, "a");
 											}
@@ -1012,8 +1073,8 @@ int main(char *envp[]){
 								}
 							}
 						}arg3[c]='\0';
-						int i=0;
-						for (i = 0 ; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
+						
+						for (int i = 0 ; i<NMAXITEMS && strcmp(items[i].nome, "a")!=0; i++) {
 							if(items[i].ID == atoi(arg1)){
 
 
@@ -1052,7 +1113,7 @@ int main(char *envp[]){
 							}else
 								strcpy(comunicacao.resposta, "O produto mencionado nao existe!");
 						}
-						if(i==0){
+						if(valido!=1){
 							strcpy(comunicacao.resposta, "O produto mencionado nao existe!");
 						}
 						saveUsersFile(fusers);
@@ -1146,6 +1207,11 @@ int main(char *envp[]){
 						else
 							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[y].nome);
 						
+					}else if(comunicacao.codMsg==12){
+						for (int j = 0; j<NMAXUSERS && strcmp(clientesOnline[j].nome, "a")!=0; j++) {
+							if(comunicacao.pid==clientesOnline[j].pid)
+								clientesOnline[j].last_heartbeat=time(NULL);
+						}
 					}
 
 				}else

@@ -2,13 +2,32 @@
 #include "header.h"
 
 char fifo[40];
-
+msgBF comunicacao;
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (fifo);
                     printf("\nadeus\n");
                     exit (1);
 
 }
+
+void *heartBeatF(void *a){
+	int n;
+	int fd=open(BACKENDFIFO, O_WRONLY);
+	do{
+	comunicacao.codMsg=12;
+	if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
+
+		printf("Enviei o meu heartbeat!\n");
+
+	}
+	else
+		printf("[ERRO] - Ao comunicar com o backend\n");
+	sleep(HEARTBEAT_INTERVAL);
+	}while(1);
+
+}
+
+
 
 int main(int argc, char*argv[]){
 
@@ -24,7 +43,6 @@ int main(int argc, char*argv[]){
 	
 	
 	//---------------------verificaExistencia utilizador---------------------------
-	msgBF comunicacao;
 	respostaBF respostaB;
 	int fd, n, fdr;
 
@@ -74,6 +92,10 @@ int main(int argc, char*argv[]){
 	close(fdr);
 	fdr= open(fifo, O_RDWR);
 	
+	 pthread_t heartBeat;
+	 if (pthread_create (&heartBeat,NULL,&heartBeatF,NULL)!=0)
+        printf("[ERRO AO CRIAR HEARTBEAT!");
+
 	/*------------thread informacoes backend---------------*/
 	
 	
@@ -554,7 +576,7 @@ int main(int argc, char*argv[]){
 						
 						if((n = read(fdr, &envia, sizeof(respostaBF)))>0){
 							
-							printf("%s\n",  envia.resposta);
+							printf("\n%s",  envia.resposta);
 							if(envia.kill==1){
 								close(fdr);
 								unlink (fifo);
@@ -585,7 +607,7 @@ int main(int argc, char*argv[]){
 										printf(", ainda sem licitacoes.");
 							
 									if(temp[g].prom!=0)
-										printf(" Em prom: %d, dur.:%d", temp[g].prom, temp[g].promDur);
+										printf(" Em prom: %d%%, dur.:%d", temp[g].prom, temp[g].promDur);
 								}
 								if(g==0)
 									printf("Lista vazia\n");

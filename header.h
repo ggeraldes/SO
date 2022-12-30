@@ -25,9 +25,12 @@
 #define FRONTENDFIFO "CLIENTE%d"
 char CLIENTE_FIFO_FINAL[100];
 
-#define NMAXUSERS 20
-#define NMAXPROMOS 10
-#define NMAXITEMS 30
+#define NMAXUSERS 2
+#define NMAXPROMOS 2
+#define NMAXITEMS 10
+
+#define HEARTBEAT_INTERVAL 5 // intervalo em segundos para verificar usuários ativos
+#define INACTIVE_TIMEOUT 5 // tempo em segundos para considerar usuário inativo
 
 
 
@@ -57,6 +60,7 @@ typedef struct cliente{
 	char nome[20];
 	char pw[20];	     //password
 	int pid;
+	time_t last_heartbeat;
 }Cliente;
 
 typedef struct leilao{
@@ -74,10 +78,12 @@ typedef struct leilao{
 	int pidProm;
 }Leilao;
 
+
 typedef struct promotor{
 	char ficheiro[30];
 	int pidP;
-	//pthread_mutex_t *m;
+	pthread_t tid;
+	pthread_mutex_t *m;
 }Promotor;
 
 
