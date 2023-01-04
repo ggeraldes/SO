@@ -11,7 +11,7 @@ backendo: backend.c header.h
 	gcc backend.c -c
 
 frontend: frontendo
-	gcc frontend.o users_lib.o -o frontend
+	gcc frontend.o users_lib.o -o frontend -lpthread
 
 backend: backendo
 	gcc backend.o users_lib.o -o backend -lpthread ${FUSERS} ${FITEMS} ${FPROMOTORES}

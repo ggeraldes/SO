@@ -21,24 +21,14 @@
 #include "users_lib.h"
 
 #define BACKENDFIFO "BACKENDFIFO"
-#define BACKENDFIFOG "BACKENDFIFOG"
 #define FRONTENDFIFO "CLIENTE%d"
-char CLIENTE_FIFO_FINAL[100];
 
 #define NMAXUSERS 2
-#define NMAXPROMOS 2
+#define NMAXPROMOS 10
 #define NMAXITEMS 10
 
-#define HEARTBEAT_INTERVAL 5 // intervalo em segundos para verificar usuários ativos
-#define INACTIVE_TIMEOUT 5 // tempo em segundos para considerar usuário inativo
-
-
-
-
-typedef struct{				//serve para parar a thread do promotor
-	int kill;				//kill=0, thread continua; kill=1, thread termina
-	char nomePromotor[30];
-}killThread;				
+#define HEARTBEAT_INTERVAL 5 // intervalo em segundos para verificar utilizadores ativos
+#define INACTIVE_TIMEOUT 5 // tempo em segundos para considerar utilizador inativo		
 
 
 
@@ -81,9 +71,12 @@ typedef struct leilao{
 
 typedef struct promotor{
 	char ficheiro[30];
+	int p_b[2];
 	int pidP;
-	pthread_t tid;
+	int kill;
 	pthread_mutex_t *m;
+	struct promotor *next;
+	
 }Promotor;
 
 

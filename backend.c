@@ -10,6 +10,9 @@ char *fusers;
 Cliente clientesOnline[NMAXUSERS]; 
 respostaBF envia;
 Leilao items[NMAXITEMS];
+int nPromos=0;
+int sair_thread=0;
+pthread_t threadPromo=0;
 /*--------------------------------*/
 
 void enviaMensagemU( char resposta[]){
@@ -24,7 +27,6 @@ void enviaMensagemU( char resposta[]){
 		fdr = open(fifo, O_RDWR);  //bloqueia - se não houver clientes
 			if((n= write(fdr, &envia, sizeof(respostaBF)))>0){
 				close(fdr);
-				printf("Enviei... (%d bytes)\n", n);
 			}
 			else
 				printf("[ERRO] - ao enviar dados a utilizador");
@@ -62,113 +64,119 @@ int verificaItems (int contadorItems){
 			return 1;
 }
 
-void sig_handler(int sig) {
-  exit (1);
-}
-void *imprimePromotor(void *a){
-	Promotor *ta = (Promotor*) a;
-
-	/*-----------------PROMOTOR-------------------*/
-				char cat[20], prom[10], dur[10];
-				char promocao[200];
-				int p_b[2];
-				int size;
-				int estado;	
-				int isto=0;
-				pipe(p_b);
-				char  res[100];
-				struct sigaction action;
-
-				int f = fork();
-				
-				if(f == 0){
-					//filho corre o promotor
-
-					 // Configurar a estrutura sigaction para especificar o manipulador de sinais
-					action.sa_handler = sig_handler;
-					sigemptyset(&action.sa_mask);
-					action.sa_flags = 0;
-					
-					// Registar o manipulador de sinais para o sinal SIGUSR1
-					if (sigaction(SIGUSR1, &action, NULL) == -1) {
-					perror("sigaction");
-					exit(EXIT_FAILURE);
-					}
-					
-					close(p_b[0]);
-					close(1);
-					dup(p_b[1]);
-					
-					isto = execl(ta->ficheiro, ta->ficheiro, NULL);
-					exit(-1);
-						
-				}
-				
-				//pai continua a correr
-				close(p_b[1]);
-				ta->pidP=f;	
-					while((size = read(p_b[0], res, 99))>0){
-						  
-							res[size] = '\0';
-							if(strcmp(res, "\n")!=0){
-								pthread_mutex_lock(ta->m);
-									printf("\n'%s':%s", ta->ficheiro, res);
-									
-
-									for(int i=0, y=0, b=0, count=0;res[i]!='\0'; i++, y++){
-										if(res[i]==' '){
-											count++;
-											b=y;
-											y=-1;
-										}
-										else{
-											if(count==0)
-												cat[y]=res[i];
-											if(count==1){
-												cat[b]='\0';
-												prom[y]=res[i];
-											}
-											if(count==2){
-												prom[b]='\0';
-												if(res[i]=='\n')
-													dur[y]='\0';
-												else
-													dur[y]=res[i];
-											}
-										}			
-									}
-
-									for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
-										if(strcmp(cat, items[i].categoria)==0){
-											items[i].promDur=atoi(dur);
-											items[i].prom=atoi(prom);
-											items[i].pidProm=ta->pidP;
-										}
-									}
-									sprintf(promocao, "Promocao nos produtos da cat.:%s de %d%%", cat, atoi(prom));
-									enviaMensagemU(promocao);
-								pthread_mutex_unlock(ta->m);
-							}
-							
-						
-					}
-				
-				close(p_b[0]);
-				wait(&estado);
-
-				for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
-					if(ta->pidP==items[i].pidProm){
-						items[i].promDur=0;
-						items[i].prom=0;
-						items[i].pidProm=0;
-						sprintf(promocao, "O produto com ID:%d já não tem promocao", items[i].ID);
-							enviaMensagemU(promocao);
-					}
-				}
-			
+void handler_sigalarm2(int s,siginfo_t *t, void *v){
 	
-    pthread_exit(NULL);
+                    printf("\nAdeus\n");
+                    pthread_exit(NULL);
+
 }
+void *imprimePromotor(void *dados){
+
+
+	Promotor *head = (Promotor*) dados;
+  	int size;
+  	int estado;  
+  	char res[100], dur[20], cat[30], prom[20];
+  	Promotor *current = head;
+	Promotor *currentL = head;
+  	while(head!=NULL){
+		threadPromo= pthread_self();	
+
+
+		fd_set read_fds;  // Conjunto de descritores de arquivos para a leitura
+		FD_ZERO(&read_fds);  // Inicializa o conjunto
+
+		currentL = head;
+      	current = head;
+		while (current != NULL) {
+			close(current->p_b[1]);
+			FD_SET(current->p_b[0], &read_fds);// Adiciona o descritor de arquivo ao conjunto
+			currentL =current;
+			current = current->next;
+		}  
+		
+		struct timeval timeout;
+		timeout.tv_sec = 1; // 5 segundos
+		timeout.tv_usec = 0; // 0 microssegundos
+
+		
+		if(sair_thread==1){
+			printf("OPA EM PRINCIPIO DEU1");
+			break;
+		}
+
+		int ret = select(currentL->p_b[0]+1, &read_fds, NULL, NULL, &timeout);
+
+		if(sair_thread==1){
+			printf("OPA EM PRINCIPIO DEU2");
+			break;
+		}
+			
+		
+		// Verifica se há dados disponíveis para serem lidos
+		if (ret == -1) {
+			perror("select");
+			exit(EXIT_FAILURE);
+		} else if (ret == 0) {
+		// Não há dados disponíveis para serem lidos
+			//printf("ohhhhhhhhhhhhhhhhhhhhh");
+		}else{
+
+			current = head;
+			while (current != NULL) {
+				if (FD_ISSET(current->p_b[0], &read_fds)) {
+					pthread_mutex_lock(current->m); 
+						size = read(current->p_b[0], res, 99);
+						res[size] = '\0';
+						if(strcmp(res,"\n")!=0){
+							printf("Promotor '%s': %s\n", current->ficheiro, res);
+
+							for(int i=0, y=0, b=0, count=0;res[i]!='\0'; i++, y++){
+								if(res[i]==' '){
+									count++;
+									b=y;
+									y=-1;
+								}
+								else{
+									if(count==0)
+										cat[y]=res[i];
+									if(count==1){
+										cat[b]='\0';
+										prom[y]=res[i];
+									}
+									if(count==2){
+										prom[b]='\0';
+										if(res[i]=='\n')
+											dur[y]='\0';
+											else
+											dur[y]=res[i];
+									}
+								}			
+							}
+                  			for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
+								if(strcmp(cat, items[i].categoria)==0){
+									items[i].promDur=atoi(dur);
+									items[i].prom=atoi(prom);
+									items[i].pidProm=current->pidP;
+								}
+							}
+						}
+					pthread_mutex_unlock(current->m);
+					
+				}
+					
+				current = current->next;
+			}				
+		}
+
+  	}
+	printf("sairtHREAD");
+  //close(p_b[0]);
+
+
+  pthread_exit(NULL);
+}
+
 
 void *decreaseTime(void *leilao){
 	char mensagemG[200];
@@ -219,11 +227,19 @@ void *decreaseTime(void *leilao){
 
 
 void handler_sigalarm(int s,siginfo_t *t, void *v){
+	
+					
                     unlink (BACKENDFIFO);
                     printf("\nAdeus\n");
                     exit (1);
 
 }
+
+/*void handler_sigalarm1(int s,siginfo_t *t, void *v){
+                    printf("\nAdeus Child\n");
+                    exit (1);
+
+}*/
 
 int getValueProm(int i){
 
@@ -240,8 +256,30 @@ int main(char *envp[]){
 	struct sigaction sa;
     sa.sa_sigaction=handler_sigalarm;
     sigaction(SIGINT, &sa, NULL);
+	
+	/*-----------------------------Interação com o cliente------------------------*/
+
+	int fd, n, fdr;
+	int sel;
+	
+	fd_set fds;
+
+	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
+    	mkfifo(BACKENDFIFO, 0600);
+    	printf("Criei o fifo\n");
+    }else{
+		fprintf(stderr, "[ERRO] - O BACKEND JÁ ESTA EM EXECUCAO!.\n"); //SE EXISTIR SAI
+        return 1;
+	}
 
 	
+	fd = open(BACKENDFIFO, O_RDWR);
+    	printf("Abri o fifo '%s'\n", BACKENDFIFO); //acrescentar ao nome do fifo, o pid para saber a que utilizador enviar a resposta
+
+	
+
+	/*----------------------------------------------------------------------------*/
+	 
 	
 
 	/*-----------variaveis de ambiente------------*/
@@ -356,24 +394,18 @@ int main(char *envp[]){
 		id=-1;
 
 	strcpy(items[contadorItens].nome, "a");
-	pthread_t tempo;
 
 	
 	
 	/*----------------------------------------------------------------------------*/
 
-	/*---------------------------------HEARTBEAT---------------------------------*/
-
-	pthread_t checkHeartBeat;
-	 if (pthread_create (&checkHeartBeat,NULL,&check_active_users,NULL)!=0)
-	  	printf("heartbeat checker nao irá funcionar!");
-
-	/*----------------------------------------------------------------------------*/
 
 	/*---------------------------------PROMOTORES---------------------------------*/
-	Promotor ativos[NMAXPROMOS];
+	//Promotor ativos[NMAXPROMOS];
 	pthread_mutex_t  mutex;  
     pthread_mutex_init(&mutex, NULL); //inicializar
+
+	Promotor *head = NULL;
 
 	i=0;
 	count=0;
@@ -384,31 +416,49 @@ int main(char *envp[]){
 		exit (-1);
 	}
 	else{
-		while (fgets(palavra, sizeof(palavra), f) && count<NMAXPROMOS) {
+		while (fgets(palavra, sizeof(palavra), f)) {
 			
 			if(palavra[strlen(palavra)-1] == '\n')
 				palavra[strlen(palavra) - 1] = '\0';
-			strcpy(ativos[i].ficheiro,palavra);
-			ativos[i].m=&mutex;
-			count++;
-			i++;
+			Promotor *new_promotor = malloc(sizeof(Promotor));
+			strcpy(new_promotor->ficheiro,palavra);
+			new_promotor->m = &mutex;
+          	new_promotor->next = head;
+          	head = new_promotor;
 			
 
 		}
 		fclose(f);
 	}
-	contadorPromotores=count;
-	printf("!%d!",contadorPromotores);
-	if(contadorPromotores<NMAXPROMOS)
-		strcpy(ativos[contadorPromotores].ficheiro, "a");
+	 Promotor *current = head;
+	int isto;
+        while (current != NULL) {
+            pipe(current->p_b);
+
+            int f = fork();
+			      if(f == 0){
+				      //filho corre o promotor
+				      close(current->p_b[0]);
+				      close(1);
+				      dup(current->p_b[1]);
+				
+				      isto = execl(current->ficheiro, current->ficheiro, NULL);
+				      exit(-1);
+						
+				    }
+            current->pidP=f;
+        
+            current = current->next;
+        }
 		
-	//pthread_t tpromotores[contadorPromotores];
-	
-	
-	for (int i=0 ; i<contadorPromotores ; i++ ){
-      if (pthread_create (&ativos[i].tid,NULL,&imprimePromotor,&ativos[i])!=0)
-	  	printf("promotor nao irá funcionar!");
-	}
+        
+      pthread_t a;
+      if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
+        return 0;
+
+		
+	//nPromos=contadorPromotores;
+    
 
 	/*if(pthread_create(&promotor,NULL,&imprimePromotor, &a)!=0)
 		printf("promotor nao irá funcionar!");
@@ -418,30 +468,16 @@ int main(char *envp[]){
 
 	/*----------------------------------------------------------------------------*/
 
+	
+
+	/*---------------------------------INICIAR THREADS----------------------------*/
+	pthread_t tempo;
 	if(pthread_create(&tempo,NULL,&decreaseTime, &items)!=0)
 		printf("[ERRO] - IMPOSSIVEL DECRESCER O TEMPO!");
 
-	/*---------------------------------INICIAR THREADS----------------------------*/
-
-	/*----------------------------------------------------------------------------*/
-
-	/*-----------------------------Interação com o cliente------------------------*/
-
-	int fd, n, fdr;
-	int sel;
-	
-	fd_set fds;
-
-	if(access(BACKENDFIFO, F_OK)!=0){//verifica se o ficheiro "BACKENDFIFO" existe, SE NAO EXISTE CRIA O FIFO
-    	mkfifo(BACKENDFIFO, 0600);
-    	printf("Criei o fifo\n");
-    }
-	
-	fd = open(BACKENDFIFO, O_RDWR);  //bloqueia - se não houver clientes
-    	printf("Abri o fifo '%s'\n", BACKENDFIFO); //acrescentar ao nome do fifo, o pid para saber a que utilizador enviar a resposta
-
-	
-
+	pthread_t checkHeartBeat;
+	 if (pthread_create (&checkHeartBeat,NULL,&check_active_users,NULL)!=0)
+	  	printf("[ERRO] - HEARTBEAT CHECKER NAO IRA FUNCIONAR!");
 	/*----------------------------------------------------------------------------*/
 	do{
 		
@@ -519,12 +555,11 @@ int main(char *envp[]){
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes
 							if((n= write(fdr, &envia, sizeof(respostaBF)))>0){
 								close(fdr);
-								printf("Enviei...%d (%d bytes)\n", pidK, n);
-							
-							printf("\nUtilizador '%s' foi kickado!\n", ndcom);
+								//printf("Enviei...%d (%d bytes)\n", pidK, n);
+								printf("\nUtilizador '%s' foi kickado!\n", ndcom);
 							}
 							else
-								printf("[ERRO] - ao enviar dados a utilizador");
+								printf("[ERRO] - ao enviar dados para dar kick ao utilizador!");
 
 							
 						}else
@@ -533,50 +568,42 @@ int main(char *envp[]){
                		}
 
 					else if(strcmp(stcom, "cancel")==0){
-
 						for(k=0,j=i+1; com[j]!='\n'; j++, k++){
 							ndcom[k] = com[j];
 						}
 						ndcom[k]='\0';
+						
+						int valido=0;
 
-						valido=0;
-						for(int g=0; strcmp(ativos[g].ficheiro, "a")!=0 && g<NMAXPROMOS; g++){
-							
-							if(strcmp(ndcom, ativos[g].ficheiro)==0){
+						current = head;	
+						if (strcmp(current->ficheiro, ndcom)==0 ) {
+							valido=1;
+							if(kill(current->pidP, SIGUSR1)!=-1)
+										wait(&current->pidP);
+							if(current != NULL && current->next == NULL){
+								printf("NULL");
+								head=NULL;
+							}else
+								head = current->next;
+			
+      						free(current);
+						}else {
+							while (current->next != NULL && strcmp(current->next->ficheiro, ndcom)!=0) {
+							current = current->next;
+      						}
+							if (current->next != NULL) {
+								if(kill(current->next->pidP, SIGUSR1)!=-1)
+										wait(&current->next->pidP);
 								valido=1;
-								if(kill(ativos[g].pidP, SIGUSR1)!=-1){
-
-									if (pthread_join(ativos[g].tid, NULL)!=0)
-											printf("[ERRO] - pthread_join\n");
-									else{
-										for (int y = g; strcmp(ativos[y].ficheiro, "a")!=0 && y<NMAXPROMOS; y++) { //apagar o item da estrutura
-											if(y<NMAXPROMOS-1){
-												ativos[y] = ativos[y+1];
-												
-											}
-											else if(y==NMAXPROMOS-1){
-												strcpy(ativos[y].ficheiro,"a");
-												ativos[y].pidP=0;
-												ativos[y].tid=0;
-											}
-										}
-										
-									}
-
-								}else{
-									printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
-								}
-
-								break;
-							}
-
-
-						}
+         						Promotor *temp = current->next;
+         						current->next = temp->next;
+         						free(temp);
+      						}
+   						}
 						if(valido==1){
-							printf("\nFicheiro de pormotores '%s' cancelado!\n", ndcom);
-						}
-						else 
-							printf("\n[ERRO] - Promotor '%s' não esta ativo!\n", ndcom);
+							printf("Promotor '%s' cancelado!\n", ndcom);
+						}else
+							printf("Promotor '%s' nao consta na lista de promotores ativos!\n", ndcom);
 					}
 				}
 
@@ -634,89 +661,176 @@ int main(char *envp[]){
 
 					}
 					else if(strcmp(com,"prom\n")==0){
-						int g=0;
-						printf("\nLista d promotores ativos:\n");
-						for(g=0; strcmp(ativos[g].ficheiro, "a")!=0 && g<NMAXPROMOS;g++){
-							printf("Promotor: '%s', pid=%d\n", ativos[g].ficheiro, ativos[g].pidP);
+						// Imprime a lista novamente
+						printf("Lista de Promotores ativos:\n");
+						current = head;
+						while (current != NULL) {
+							printf("Promotor: %s, Pid: %d\n", current->ficheiro, current->pidP);
+							current = current->next;
 						}
-						if(g==0)
-							printf("Nao ha promotores ativos\n");
+						
 					}
 					else if(strcmp(com,"reprom\n")==0){
+					
 
-						i=0;
-						count=0;
 						f = fopen(fpromotor, "r");
-						int valida=0;
-						int guarda=0;
-						Promotor temp[NMAXPROMOS];
+						Promotor *temp=NULL;
+						int add=0, rm=0;
+
+
+						int found=0; 
+
 						if (f == NULL) {
 							perror("[ERRO] - Ao abrir o arquivo de promotores!");
+							exit (-1);
 						}
-						else{
+						
+						while (fgets(palavra, sizeof(palavra), f)) {
+								
+							if(palavra[strlen(palavra)-1] == '\n')
+							palavra[strlen(palavra) - 1] = '\0';
+							Promotor *new_promotor = malloc(sizeof(Promotor));
+							strcpy(new_promotor->ficheiro,palavra);
+							new_promotor->m = &mutex;
+							new_promotor->next = temp;
+							temp = new_promotor;
+								
+						}
+						fclose(f);
 
-							while (fgets(palavra, sizeof(palavra), f) && count<NMAXPROMOS) {
-								valida=0;
-								if(palavra[strlen(palavra)-1] == '\n')
-										palavra[strlen(palavra) - 1] = '\0';
 
-								for (int g = 0; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
-									if (strcmp(ativos[g].ficheiro, palavra) == 0){
-										temp[count++]=ativos[g];
-										valida=1; // Encontrou o elemento
-										guarda=g;
-										break;
-									}	
-									
+						Promotor *curr = head;
+						Promotor *prev = NULL;
+
+						while(curr!=NULL){
+							Promotor *temp2=temp;
+							int found=0;
+
+							while(temp2!=NULL){
+								if(strcmp(temp2->ficheiro, curr->ficheiro)==0){
+									found=1;
+									break;
 								}
-								if(valida==1){
-									for (int g = guarda; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
-										if(g<NMAXPROMOS-1){
-											ativos[g] = ativos[g+1];
-										}
-										else if(g==NMAXPROMOS-1){
-											strcpy(ativos[g].ficheiro,"a");
-											ativos[g].pidP=0;
-											temp[g].tid=0;
-											break;
-										}
-									}	
-									
-								}else{
-									strcpy(temp[count].ficheiro,palavra);
-									temp[count].pidP=0;
-									temp[count].tid=0;
-									count++;
-								}
-								i++;	
-
+								temp2=temp2->next;
 							}
-							fclose(f);
-						}
-						if(count<NMAXPROMOS)
-							strcpy(temp[count].ficheiro, "a");
 
-						for (int g = 0; g < NMAXPROMOS && strcmp(ativos[g].ficheiro, "a")!=0; g++) {
-							if (kill(ativos[g].pidP, SIGUSR1)==-1)
-								printf("[ERRO] - AO MATAR PROCESSO %d\n", ativos[g].pidP);
-							else{
-								if (pthread_join(ativos[g].tid, NULL)!=0)
-									printf("[ERRO] - pthread_join\n");
+							if(found!=1){
+								rm=1;
+								if(threadPromo!=0){
+									sair_thread=1;
+									pthread_join(threadPromo, NULL);
+								}
+
+								if(kill(curr->pidP, SIGUSR1)!=-1){
+									int pidM=curr->pidP;
+									wait(&curr->pidP);
+									for(int i=0; i<NMAXITEMS, strcmp(items[i].nome, "a")!=0; i++){
+										if(pidM==items[i].pidProm){
+											items[i].promDur=0;
+											items[i].prom=0;
+											items[i].pidProm=0;
+											sprintf(mensagemG, "O produto com ID:%d já não tem promocao", items[i].ID);
+											enviaMensagemU(mensagemG);
+									}
+									
+									}
+								}
+
+								if (prev == NULL) {
+									head = curr->next;
+								} else {
+									prev->next = curr->next;
+								}
+								free(curr);
+							}else{
+								prev = curr;
+							}
+							curr = curr->next;
+						}
+
+						// add new elements from temp list to original list
+						while (temp != NULL) {
+							Promotor *temp2 = head;
+							int found = 0;
+
+							while (temp2 != NULL) {
+								if (strcmp(temp->ficheiro, temp2->ficheiro)==0) {
+									found = 1;
+									break;
+								}
+								temp2 = temp2->next;
 							}
 							
-						}
+							if (found!=1) {
+								add=1;
+								// element from temp list not found in original list, add it
+								if(threadPromo!=0){
+									sair_thread=1;
+									pthread_join(threadPromo, NULL);
+								}
 
-						for(int g=0; g<NMAXPROMOS; g++)
-							ativos[g]=temp[g];
-
-						//pthread_t tp[count];
-
-						for (int i=0 ; i<count ; i++ ){
-							if(ativos[i].pidP==0){
-								if (pthread_create (&ativos[i].tid,NULL,&imprimePromotor,&ativos[i])!=0)
-									printf("promotor nao irá funcionar!");
+								Promotor *new_promotor = malloc(sizeof(Promotor));
+								strcpy(new_promotor->ficheiro,temp->ficheiro);
+								new_promotor->m = &mutex;
+								new_promotor->pidP = 0;
+								new_promotor->next = head;
+								head = new_promotor;
+							
+								
 							}
+
+							temp = temp->next;
 						}
+
+						
+						current=head;
+
+						while(current!=NULL){
+							if(current->pidP==0){
+								pipe(current->p_b);
+
+								int f = fork();
+								if(f == 0){
+									//filho corre o promotor
+									close(current->p_b[0]);
+									close(1);
+									dup(current->p_b[1]);
+									
+									isto = execl(current->ficheiro, current->ficheiro, NULL);
+									exit(-1);
+											
+								}
+								current->pidP = f;
+							}
+							current=current->next;
+						}
+
+						
+						pthread_t a;
+						threadPromo=0;
+						sair_thread=0;
+						if(add==0 && rm==0)
+							printf("Não foram feitas alteracoes aos promotores.\n");
+						else if(add!=0 && rm==0){
+							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
+								return 0;
+							printf("Foram adicionados promotores.\n");
+						}	
+						else if(add==0 && rm!=0){
+							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
+								return 0;
+							printf("Foram removidos promotores.\n");
+						}
+						else{
+							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
+								return 0;
+							printf("Foram removidos promotores e tambem adicionados novos.\n");
+						}
+							
+						
+
+						
+							
 
 					}
 					else if(strcmp(com,"close\n")==0){
@@ -734,6 +848,11 @@ int main(char *envp[]){
 
 						strcpy(mensagemG, "A plataforma vai encerrar");
 						enviaMensagemU(mensagemG);
+
+						if(threadPromo!=0){
+							sair_thread=1;
+							pthread_join(threadPromo, NULL);
+						}
 
 						close(fd);
 						unlink(BACKENDFIFO);
@@ -1208,6 +1327,7 @@ int main(char *envp[]){
 							printf("[ERRO] - ao desconectar utilizador %s", clientesOnline[y].nome);
 						
 					}else if(comunicacao.codMsg==12){
+						
 						for (int j = 0; j<NMAXUSERS && strcmp(clientesOnline[j].nome, "a")!=0; j++) {
 							if(comunicacao.pid==clientesOnline[j].pid)
 								clientesOnline[j].last_heartbeat=time(NULL);
