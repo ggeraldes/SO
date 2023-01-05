@@ -3,6 +3,7 @@
 
 char fifo[40];
 msgBF comunicacao;
+int HEARTBEATINTERVAL=0;
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (fifo);
                     printf("\nadeus\n");
@@ -17,26 +18,26 @@ void *heartBeatF(void *a){
 	comunicacao.codMsg=12;
 	if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 
-		printf("Enviei o meu heartbeat!\n");
+		//printf("Enviei o meu heartbeat!\n");
 
 	}
 	else
 		printf("[ERRO] - Ao comunicar com o backend\n");
-	sleep(HEARTBEAT_INTERVAL);
+	sleep(HEARTBEATINTERVAL);
 	}while(1);
 
 }
 
 
 
-int main(int argc, char*argv[]){
+int main(int argc, char*argv[], char *envp[]){
 
 	struct sigaction sa;
     sa.sa_sigaction=handler_sigalarm;
     sigaction(SIGINT, &sa, NULL);
 	
 	if(argc != 3){
-		printf("\nPor favor indique o seu nome e a sua password!\n");
+		printf("\nPor favor indique o seu nome e password!\n");
 		exit(-1);
 	}
 
@@ -58,7 +59,7 @@ int main(int argc, char*argv[]){
 
 	//Abrir o fifo do backend
 	fd = open(BACKENDFIFO, O_WRONLY);
-    printf("Abri o fifo do backend - '%s'\n", BACKENDFIFO);
+    //printf("Abri o fifo do backend - '%s'\n", BACKENDFIFO);
 
 	//meter dados da sessão na estrutura, para enviar ao backend
 	comunicacao.codMsg=0;
@@ -68,7 +69,7 @@ int main(int argc, char*argv[]){
 
 	//mandar a struct ao backend
 	if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-	printf("Enviei...%d %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.mensagem, comunicacao.pid, comunicacao.arg3, n);
+	//printf("Enviei...%d %s %d %s (%d bytes)\n", comunicacao.codMsg, comunicacao.mensagem, comunicacao.pid, comunicacao.arg3, n);
 	}else
 		printf("[ERRO] - Ao comunicar com o backend\n");
 
@@ -91,10 +92,26 @@ int main(int argc, char*argv[]){
 
 	close(fdr);
 	fdr= open(fifo, O_RDWR);
+	/*----------------------HEARTBEAT-----------------------*/
 	
+	
+	if(getenv("HEARTBEAT")){
+		if(atoi(getenv("HEARTBEAT"))){
+			HEARTBEATINTERVAL = atoi(getenv("HEARTBEAT"));
+			printf("HEARTBEAT-VALIDO");
+		}
+		else
+			HEARTBEATINTERVAL = HEARTBEAT_INTERVAL;	
+	}
+	else
+		HEARTBEATINTERVAL = HEARTBEAT_INTERVAL;
+
 	 pthread_t heartBeat;
 	 if (pthread_create (&heartBeat,NULL,&heartBeatF,NULL)!=0)
         printf("[ERRO AO CRIAR HEARTBEAT!");
+
+
+	/*------------------------------------------------------*/
 
 	/*------------thread informacoes backend---------------*/
 	
@@ -197,7 +214,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=1;
-							printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+							//printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
 							printf("\nLista de itens a venda pelo do utilizador '%s':\n", ndcom);
 						}
 						else
@@ -243,7 +260,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=1;
-							printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+							//printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
 							printf("\nLista de itens da categoria '%s':\n", ndcom);
 						}
 						else
@@ -288,7 +305,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=1;
-							printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+							//printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
 							printf("\nLista des itens cujo o valor máx. é %s€:\n", ndcom);
 						}
 						else
@@ -333,7 +350,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=1;
-							printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+							//printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
 							printf("\nLista de itens com prazo até %ss:\n", ndcom);
 						}
 						else
@@ -377,7 +394,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=2;
-							printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
+							//printf("Enviei...%d %d (%d bytes)\n", comunicacao.codMsg, comunicacao.pid, n);
 						}
 						else
 							printf("[ERRO] - Ao comunicar com o backend\n");
@@ -424,7 +441,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=2;
-							printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+							//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 						}
 						else
 							printf("[ERRO] - Ao comunicar com o backend\n");
@@ -485,7 +502,7 @@ int main(int argc, char*argv[]){
 						//mandar a struct ao backend
 						if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 							VARIMPOR=2;
-							printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+							//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 						}
 						else
 							printf("[ERRO] - Ao comunicar com o backend\n");
@@ -507,7 +524,7 @@ int main(int argc, char*argv[]){
 				//mandar a struct ao backend
 					if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 						VARIMPOR=1;
-						printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+						//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 						printf("Lista de itens em Leilao:\n");
 					}
 					else
@@ -526,7 +543,7 @@ int main(int argc, char*argv[]){
 				//mandar a struct ao backend
 				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 					VARIMPOR=2;
-					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 				}
 				else
 					printf("[ERRO] - Ao comunicar com o backend\n");
@@ -542,7 +559,7 @@ int main(int argc, char*argv[]){
 				//mandar a struct ao backend
 				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
 					VARIMPOR=2;
-					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 				}
 				else
 					printf("[ERRO] - Ao comunicar com o backend\n");
@@ -555,7 +572,7 @@ int main(int argc, char*argv[]){
 
 				//mandar a struct ao backend
 				if((n=write(fd, &comunicacao, sizeof(msgBF)))>0){
-					printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
+					//printf("Enviei...%d (%d bytes)\n", comunicacao.codMsg, n);
 					close(fdr);
 					unlink (fifo);
 					exit(-1);
@@ -576,7 +593,7 @@ int main(int argc, char*argv[]){
 						
 						if((n = read(fdr, &envia, sizeof(respostaBF)))>0){
 							
-							printf("\n%s",  envia.resposta);
+							printf("\n%s\n",  envia.resposta);
 							if(envia.kill==1){
 								close(fdr);
 								unlink (fifo);

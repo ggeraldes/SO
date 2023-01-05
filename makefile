@@ -14,7 +14,7 @@ frontend: frontendo
 	gcc frontend.o users_lib.o -o frontend -lpthread
 
 backend: backendo
-	gcc backend.o users_lib.o -o backend -lpthread ${FUSERS} ${FITEMS} ${FPROMOTORES}
+	gcc backend.o users_lib.o -o backend -lpthread
 
 all: frontend backend
 

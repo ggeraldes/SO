@@ -28,7 +28,7 @@
 #define NMAXITEMS 10
 
 #define HEARTBEAT_INTERVAL 5 // intervalo em segundos para verificar utilizadores ativos
-#define INACTIVE_TIMEOUT 5 // tempo em segundos para considerar utilizador inativo		
+#define INACTIVE_TIMEOUT 7 // tempo em segundos para considerar utilizador inativo		
 
 
 
@@ -73,7 +73,7 @@ typedef struct promotor{
 	char ficheiro[30];
 	int p_b[2];
 	int pidP;
-	int kill;
+	//int kill;
 	pthread_mutex_t *m;
 	struct promotor *next;
 	
