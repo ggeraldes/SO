@@ -3,7 +3,7 @@
 
 char fifo[40];
 msgBF comunicacao;
-int HEARTBEATINTERVAL=0;
+int HEARTBEATINTERVAL=HEARTBEAT_INTERVAL;
 void handler_sigalarm(int s,siginfo_t *t, void *v){
                     unlink (fifo);
                     printf("\nadeus\n");
@@ -30,7 +30,7 @@ void *heartBeatF(void *a){
 
 
 
-int main(int argc, char*argv[], char *envp[]){
+int main(int argc, char*argv[]){
 
 	struct sigaction sa;
     sa.sa_sigaction=handler_sigalarm;
@@ -95,17 +95,9 @@ int main(int argc, char*argv[], char *envp[]){
 	/*----------------------HEARTBEAT-----------------------*/
 	
 	
-	if(getenv("HEARTBEAT")){
-		if(atoi(getenv("HEARTBEAT"))){
-			HEARTBEATINTERVAL = atoi(getenv("HEARTBEAT"));
-			printf("HEARTBEAT-VALIDO");
-		}
-		else
-			HEARTBEATINTERVAL = HEARTBEAT_INTERVAL;	
-	}
-	else
-		HEARTBEATINTERVAL = HEARTBEAT_INTERVAL;
-
+	
+	HEARTBEATINTERVAL=comunicacao.heartbeatTime;
+	//printf("!%d!", HEARTBEATINTERVAL);
 	 pthread_t heartBeat;
 	 if (pthread_create (&heartBeat,NULL,&heartBeatF,NULL)!=0)
         printf("[ERRO AO CRIAR HEARTBEAT!");
@@ -147,7 +139,6 @@ int main(int argc, char*argv[], char *envp[]){
 
 	fd_set fds;
 	int sel;
-
 
 	do{
 		if(VARIMPOR!=1 && VARIMPOR!=2){

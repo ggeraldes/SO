@@ -12,6 +12,8 @@ respostaBF envia;
 Leilao items[NMAXITEMS];
 int sair_thread=0;
 pthread_t threadPromo=0;
+int heartBeat=HEARTBEAT_INTERVAL;
+int interval=INACTIVE_TIMEOUT;
 /*--------------------------------*/
 
 void enviaMensagemU( char resposta[]){
@@ -40,7 +42,7 @@ void *check_active_users(void *a) {
   do{
 		for (int i = 0; i < NMAXUSERS && strcmp(clientesOnline[i].nome, "a")!=0; i++) {
 			time_t now = time(NULL); // obtém a hora atual
-			if (now - clientesOnline[i].last_heartbeat > INACTIVE_TIMEOUT) {
+			if (now - clientesOnline[i].last_heartbeat > interval) {
 				flagNMaxU=0;
 			// utilizadore inativo, remove da struct
 				for(int g=i; g < NMAXUSERS && strcmp(clientesOnline[g].nome, "a")!=0; g++){
@@ -290,6 +292,10 @@ int main(char *envp[]){
 	if(getenv("FITEMS")){
   		fitems = getenv("FITEMS");
 	}
+	if(getenv("HEARTBEAT")){
+  		heartBeat = atoi(getenv("HEARTBEAT"));
+		interval = heartBeat+2;
+	}
 	/*--------------------------------------------*/
 	/*----------------VARIAVEIS-------------------*/
 	int op;
@@ -475,7 +481,7 @@ int main(char *envp[]){
 
 	int sel;
 	fd_set fds;
-
+	printf("Bem-vindo ao SO-BAY\n");
 	do{
 		
 		envia.kill=0; //se tiver a 1, da kill aos frontends
@@ -580,7 +586,8 @@ int main(char *envp[]){
 								if(threadPromo!=0){
 										sair_thread=1;
 										pthread_join(threadPromo, NULL);
-										threadPromo==0;
+										threadPromo=0;
+										sair_thread=0;
 								}
 								if(kill(current->pidP, SIGUSR1)!=-1){
 										int pidM=current->pidP;
@@ -611,7 +618,8 @@ int main(char *envp[]){
 									if(threadPromo!=0){ 
 										sair_thread=1;
 										pthread_join(threadPromo, NULL);
-										threadPromo==0;
+										threadPromo=0;
+										sair_thread=0;
 									}
 									if(kill(temp->pidP, SIGUSR1)!=-1){
 										int pidM=temp->pidP;
@@ -634,8 +642,6 @@ int main(char *envp[]){
 						}
 						if(valido==1){
 							pthread_t a;
-							sair_thread=0;
-							threadPromo=0;
 							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
 								return 0;
 							printf("Promotor '%s' cancelado!\n", ndcom);
@@ -660,7 +666,7 @@ int main(char *envp[]){
 							printf("Não há clientes");
 
 						else{
-							printf("\nLista de utilizadores online\n");
+							printf("\nLista de utilizadores online:\n");
 							int g;
 							for(g=0; g<NMAXUSERS && strcmp(clientesOnline[g].nome, "a")!=0;g++){
 
@@ -680,7 +686,7 @@ int main(char *envp[]){
 							printf("Aconteceu um ERRO a abrir o ficheiro '%s'", fitems);
 						}
 						else{
-							printf("\nLista os itens em Leilao:\n");
+							printf("\nLista de itens em Leilao:\n");
 							if(verificaItems(contadorItens)==1){
 								
 								for(int g=0; strcmp(items[g].nome, "a")!=0 && g<NMAXITEMS;g++){
@@ -752,7 +758,7 @@ int main(char *envp[]){
 						while(curr!=NULL){
 							Promotor *temp2=temp;
 							int found=0;
-
+							
 							while(temp2!=NULL){
 								if(strcmp(temp2->ficheiro, curr->ficheiro)==0){
 									found=1;
@@ -764,7 +770,12 @@ int main(char *envp[]){
 
 							if(found!=1){
 								rm=1;
-								
+								if(threadPromo!=0){ 
+									sair_thread=1;
+									pthread_join(threadPromo, NULL);
+									threadPromo=0;
+									sair_thread=0;
+								}
 
 								if(kill(curr->pidP, SIGUSR1)!=-1){
 									int pidM=curr->pidP;
@@ -794,12 +805,7 @@ int main(char *envp[]){
 							}
 							curr = curr->next;
 						}
-						if(rm==1){
-							if(threadPromo!=0){
-									sair_thread=1;
-									pthread_join(threadPromo, NULL);
-								}
-						}
+						
 
 						// verificar se existem promotores no novo ficheiro que nao existem no antigo
 						while (temp != NULL) {
@@ -817,9 +823,11 @@ int main(char *envp[]){
 							if (found!=1) {
 								add=1;
 								// elemento da lista temp nao é encontrado na principal, logo é adicionado
-								if(threadPromo!=0){
+								if(threadPromo!=0){ 
 									sair_thread=1;
 									pthread_join(threadPromo, NULL);
+									threadPromo=0;
+									sair_thread=0;
 								}
 
 								Promotor *new_promotor = malloc(sizeof(Promotor));
@@ -860,23 +868,20 @@ int main(char *envp[]){
 
 						
 						pthread_t a;
-						sair_thread=0;
+						
 						if(add==0 && rm==0)
 							printf("Não foram feitas alteracoes aos promotores.\n");
 						else if(add!=0 && rm==0){
-							threadPromo=0;
 							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
 								return 0;
 							printf("Foram adicionados promotores.\n");
 						}	
 						else if(add==0 && rm!=0){
-							threadPromo=0;
 							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
 								return 0;
 							printf("Foram removidos promotores.\n");
 						}
 						else{
-							threadPromo=0;
 							if (pthread_create (&a,NULL,&imprimePromotor,(void *)head)!=0)
 								return 0;
 							printf("Foram removidos promotores e tambem adicionados novos.\n");
@@ -967,7 +972,7 @@ int main(char *envp[]){
 							if(isUserValid(arg1,arg2)==1){
 									strcpy(comunicacao.arg3, "1");
 									//printf("%s",comunicacao.arg3);
-
+									comunicacao.heartbeatTime=heartBeat;
 									//meter utilizador na estrutura online
 									for(int i=0;i<NMAXUSERS;i++){
 										if(strcmp(clientesOnline[i].nome, "a")==0){
@@ -984,7 +989,7 @@ int main(char *envp[]){
 											break;
 										}
 									}
-									sprintf(comunicacao.resposta, "Bem vindo!");
+									sprintf(comunicacao.resposta, "Bem-vindo ao SO BAY!");
 								}else
 									sprintf(comunicacao.resposta, "Utilizador não existe!");
 
@@ -1002,6 +1007,7 @@ int main(char *envp[]){
 								sprintf(comunicacao.resposta, "Utilizador já se encntra online!");
 							else if(flagNMaxU==1)
 								sprintf(comunicacao.resposta, "O número máximo de utilizadores foi atingido!");
+
 							//enviar resposta
 							sprintf(fifo, FRONTENDFIFO, comunicacao.pid);
 							fdr = open(fifo, O_WRONLY);  //bloqueia - se não houver clientes

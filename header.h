@@ -23,9 +23,9 @@
 #define BACKENDFIFO "BACKENDFIFO"
 #define FRONTENDFIFO "CLIENTE%d"
 
-#define NMAXUSERS 2
+#define NMAXUSERS 20
 #define NMAXPROMOS 10
-#define NMAXITEMS 10
+#define NMAXITEMS 30
 
 #define HEARTBEAT_INTERVAL 5 // intervalo em segundos para verificar utilizadores ativos
 #define INACTIVE_TIMEOUT 7 // tempo em segundos para considerar utilizador inativo		
@@ -37,7 +37,8 @@ typedef struct{			   		//-------------------COMUNICAÇÃO BACKEND-FRONTEND------
 	int pid;			   		//cod=3 (para licat), cod=4 (para lisel), cod=5 (para lival), cod=6 (para litime), 
 	char mensagem[200];		    //cod=7 (para time), cod=8 (para buy), cod=9 (para cash), cod=10 (para add), cod=11 (para exit)
 	char arg3[20];				// valida a sessao
-	char resposta[100];	   	
+	char resposta[100];
+	int heartbeatTime;   	
 }msgBF;
 
 typedef struct{			   //-------------------RESPOSTA BACKEND-FRONTEND-------------------------
